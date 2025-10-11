@@ -99,7 +99,7 @@ resolved_dir=$(dirname "${resolved_selection}")
 launch_in_terminal() {
   local command_to_run="$1"
   export COMMAND_TO_RUN="${command_to_run}"
-  local shell_snippet='eval "$COMMAND_TO_RUN"; exit_code=$?; echo; read -rp "Press Enter to close..."; exit $exit_code'
+  local shell_snippet='eval "$COMMAND_TO_RUN"; exit_code=$?; echo; exit $exit_code'
 
   if command -v gnome-terminal >/dev/null 2>&1; then
     gnome-terminal -- bash -lc "${shell_snippet}"
