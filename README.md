@@ -1,6 +1,6 @@
 # Linux Start Menu
 
-A lightweight GTK-based start menu for Linux that launches shell scripts from a customizable folder structure.
+A lightweight GTK-based Windows-like start menu for Linux that launches shell scripts from a customizable folder structure.
 
 ## Overview
 
