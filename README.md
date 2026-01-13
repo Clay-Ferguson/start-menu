@@ -72,6 +72,8 @@ read -p "Press Enter to continue..."
 
 When `Terminal=true` is detected (case-insensitive, spaces ignored), the script will launch in a new `gnome-terminal` window that stays open after the script completes.
 
+**Working Directory:** When running in a terminal, the working directory is automatically set to the folder containing the script. If the script is a symbolic link, the working directory will be the folder containing the actual target file, not the link itself.
+
 **Use cases:**
 - Scripts that require user input
 - Scripts with important output to review

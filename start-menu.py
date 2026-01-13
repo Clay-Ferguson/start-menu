@@ -88,8 +88,11 @@ def run_script(menu_item, script_path):
     
     # Check if script wants a visible terminal
     if needs_terminal(script_path):
+        # Resolve symlinks to get the actual script location
+        real_script_path = os.path.realpath(script_path)
+        script_dir = os.path.dirname(real_script_path)
         subprocess.Popen(
-            ['gnome-terminal', '--', 'bash', '-c', f'"{script_path}"; exec bash'],
+            ['gnome-terminal', f'--working-directory={script_dir}', '--', 'bash', '-c', f'"{script_path}"; exec bash'],
             start_new_session=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
