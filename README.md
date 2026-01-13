@@ -124,6 +124,18 @@ To remove Start Menu from the dock and applications menu:
 
 Note: The uninstall script only removes the desktop integration—your source files remain intact.
 
+## Configure Menu Item
+
+At the bottom of the menu, you'll find a **Configure** option. Clicking it opens the installed `.desktop` file (`~/.local/share/applications/start-menu.desktop`) in your default text editor.
+
+This allows you to easily change the scripts folder by modifying the `Exec=` line. For example, to use a different folder:
+
+```ini
+Exec=/path/to/start-menu.py my-custom-folder
+```
+
+**Note:** The Configure option assumes you've installed Start Menu using `install.sh`. If you're running the script directly without installation, the `.desktop` file won't exist.
+
 ## Tips
 
 - **Quick access**: Bind `start-menu.py` to a keyboard shortcut or mouse gesture for instant access

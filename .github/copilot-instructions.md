@@ -1,8 +1,8 @@
-# Copilot Instructions for Commander
+# Copilot Instructions for `Start Menu`
 
 ## Project Overview
 
-Commander is a GTK3-based popup start menu for Linux that dynamically builds menus from a `scripts/` folder structure. The main entry point is [start-menu.py](../start-menu.py).
+`Start Menu` is a GTK3-based popup start menu for Linux that dynamically builds menus from a `scripts/` folder structure. The main entry point is [start-menu.py](../start-menu.py).
 
 ## Architecture
 
