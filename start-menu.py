@@ -31,6 +31,9 @@ else:
 
 # CSS for menu styling
 CSS = b"""
+menu {
+    border: 2px solid @theme_fg_color;
+}
 menu menuitem {
     padding-top: 10px;
     padding-bottom: 10px;
