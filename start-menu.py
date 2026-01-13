@@ -6,13 +6,28 @@ Scans the scripts/ folder and builds native popup menus from the folder structur
 
 import os
 import subprocess
+import sys
 import gi
 
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GLib
 
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+# Default folder name containing your scripts (relative to this file's location)
+# Can be overridden by passing a folder name as a command-line argument
+SCRIPTS_FOLDER_NAME = "scripts"
+
+# =============================================================================
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SCRIPTS_FOLDER = os.path.join(SCRIPT_DIR, "scripts")
+
+# Use command-line argument if provided, otherwise use default
+if len(sys.argv) > 1:
+    SCRIPTS_FOLDER = os.path.join(SCRIPT_DIR, sys.argv[1])
+else:
+    SCRIPTS_FOLDER = os.path.join(SCRIPT_DIR, SCRIPTS_FOLDER_NAME)
 
 # CSS for menu styling
 CSS = b"""
@@ -47,9 +62,6 @@ def clean_display_name(filename):
         if name.endswith(ext):
             name = name[:-len(ext)]
             break
-    # Also remove leading underscore if present
-    if name.startswith('_'):
-        name = name[1:]
     return name
 
 

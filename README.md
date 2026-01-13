@@ -24,6 +24,13 @@ Run the menu:
 ./start-menu.py
 ```
 
+Optionally, specify a different scripts folder:
+```bash
+./start-menu.py myfolder
+```
+
+The folder name is relative to the script's location. If no argument is provided, it defaults to `scripts/`.
+
 The menu will pop up at your current mouse position. Click a script to run it, or click outside / press Escape to dismiss.
 
 ## Defining the Menu Structure
