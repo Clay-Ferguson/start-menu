@@ -101,6 +101,27 @@ To install:
    ```
 3. You can also assign a keyboard shortcut to the `Exec` command in your desktop environment settings
 
+## Quick Install for GNOME/Ubuntu
+
+For GNOME/Ubuntu users, you can automatically install Start Menu to your dock with a single command:
+
+```bash
+./install.sh
+```
+
+This will:
+- Create a `.desktop` file with the correct paths
+- Add Start Menu to your dock for single-click launching
+- Set up the custom icon
+
+To remove Start Menu from the dock and applications menu:
+
+```bash
+./uninstall.sh
+```
+
+Note: The uninstall script only removes the desktop integration—your source files remain intact.
+
 ## Tips
 
 - **Quick access**: Bind `start-menu.py` to a keyboard shortcut or mouse gesture for instant access

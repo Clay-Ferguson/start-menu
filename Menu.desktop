@@ -2,7 +2,7 @@
 Name=Start Menu
 Comment=Script Launcher Menu
 Exec=/home/clay/ferguson/Commander/start-menu.py
-Icon=application-x-executable
+Icon=/home/clay/ferguson/Commander/start-menu.png
 Terminal=false
 Type=Application
 Categories=Utility;
