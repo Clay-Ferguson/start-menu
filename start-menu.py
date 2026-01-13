@@ -180,16 +180,45 @@ def open_configure(menu_item):
     Gtk.main_quit()
 
 
+def create_welcome_script(scripts_folder):
+    """Create a default welcome.sh script in a newly created scripts folder"""
+    os.makedirs(scripts_folder, exist_ok=True)
+    
+    welcome_path = os.path.join(scripts_folder, "welcome.sh")
+    welcome_content = f'''#!/bin/bash
+# Terminal=true
+
+echo ""
+echo "=========================================="
+echo "  Welcome to Start Menu!"
+echo "=========================================="
+echo ""
+echo "Your scripts folder was just created at:"
+echo ""
+echo "  {scripts_folder}"
+echo ""
+echo "Add your own shell scripts (.sh, .py, etc.)"
+echo "to this folder and they will appear in the menu."
+echo ""
+echo "Organize scripts into subfolders to create submenus."
+echo ""
+echo "=========================================="
+echo ""
+read -n 1 -s -r -p "Press any key to close..."
+echo ""
+'''
+    
+    with open(welcome_path, 'w') as f:
+        f.write(welcome_content)
+    
+    # Make it executable
+    os.chmod(welcome_path, 0o755)
+
+
 def main():
     if not os.path.isdir(SCRIPTS_FOLDER):
-        dialog = Gtk.MessageDialog(
-            message_type=Gtk.MessageType.ERROR,
-            buttons=Gtk.ButtonsType.OK,
-            text=f"Scripts folder not found:\n{SCRIPTS_FOLDER}"
-        )
-        dialog.run()
-        dialog.destroy()
-        return
+        # Create the scripts folder with a welcome script
+        create_welcome_script(SCRIPTS_FOLDER)
     
     # Apply custom styling
     apply_css()
