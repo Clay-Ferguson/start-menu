@@ -92,7 +92,7 @@ def run_script(menu_item, script_path):
         real_script_path = os.path.realpath(script_path)
         script_dir = os.path.dirname(real_script_path)
         subprocess.Popen(
-            ['gnome-terminal', f'--working-directory={script_dir}', '--', 'bash', '-c', f'"{script_path}"; exec bash'],
+            ['gnome-terminal', f'--working-directory={script_dir}', '--', 'bash', script_path],
             start_new_session=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
