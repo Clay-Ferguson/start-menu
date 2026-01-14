@@ -1,1 +1,0 @@
-/home/clay/ferguson/scripts/docker/clean-images.sh
