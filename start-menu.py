@@ -33,12 +33,16 @@ else:
 CSS = b"""
 menu {
     border: 2px solid @theme_fg_color;
+    padding: 4px;
 }
 menu menuitem {
     padding-top: 10px;
     padding-bottom: 10px;
     padding-left: 12px;
     padding-right: 12px;
+}
+menu menuitem:hover {
+    background-color: #4a6fa5;
 }
 menu menuitem label {
     padding-top: 4px;
