@@ -90,29 +90,33 @@ def needs_terminal(script_path):
 def run_script(menu_item, script_path):
     """Execute the selected script"""
     
+    # Resolve symlinks to get the actual script location
+    # This ensures the working directory is where the real script lives
+    real_script_path = os.path.realpath(script_path)
+    script_dir = os.path.dirname(real_script_path)
+    
     # Check if script wants a visible terminal
     if needs_terminal(script_path):
-        # Resolve symlinks to get the actual script location
-        real_script_path = os.path.realpath(script_path)
-        script_dir = os.path.dirname(real_script_path)
         subprocess.Popen(
-            ['gnome-terminal', f'--working-directory={script_dir}', '--', 'bash', script_path],
+            ['gnome-terminal', f'--working-directory={script_dir}', '--', 'bash', real_script_path],
             start_new_session=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
     else:
         # Detach the subprocess completely so it outlives this script
-        if os.access(script_path, os.X_OK):
+        if os.access(real_script_path, os.X_OK):
             subprocess.Popen(
-                [script_path],
+                [real_script_path],
+                cwd=script_dir,
                 start_new_session=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
         else:
             subprocess.Popen(
-                ['bash', script_path],
+                ['bash', real_script_path],
+                cwd=script_dir,
                 start_new_session=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
