@@ -10,6 +10,26 @@ DESKTOP_FILE="$HOME/.local/share/applications/start-menu.desktop"
 APP_ID="start-menu.desktop"
 
 echo "Installing Start Menu..."
+echo ""
+
+# Prompt user for menu folder path
+echo "Enter the path to your scripts/menu folder."
+echo "Leave blank to use the default: $SCRIPT_DIR/scripts"
+echo ""
+read -p "Menu folder path: " MENU_FOLDER
+
+# Validate the folder path
+if [[ -z "$MENU_FOLDER" ]]; then
+    echo "Using default folder: $SCRIPT_DIR/scripts"
+    MENU_FOLDER=""
+elif [[ ! -d "$MENU_FOLDER" ]]; then
+    echo "Error: The folder '$MENU_FOLDER' does not exist."
+    exit 1
+else
+    echo "Using folder: $MENU_FOLDER"
+fi
+
+echo ""
 
 # Ensure the applications directory exists
 mkdir -p "$HOME/.local/share/applications"
@@ -19,7 +39,7 @@ cat > "$DESKTOP_FILE" << EOF
 [Desktop Entry]
 Name=Start Menu
 Comment=GTK popup menu for launching scripts
-Exec=$SCRIPT_DIR/start-menu.py
+Exec=$SCRIPT_DIR/start-menu.py $MENU_FOLDER
 Icon=$SCRIPT_DIR/start-menu.png
 Terminal=false
 Type=Application

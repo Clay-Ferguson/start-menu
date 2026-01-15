@@ -138,21 +138,6 @@ Exec=/path/to/start-menu.py my-custom-folder
 
 **Note:** The Configure option assumes you've installed Start Menu using `install.sh`. If you're running the script directly without installation, the `.desktop` file won't exist.
 
-## Demo Scripts
-
-The `demo-scripts/` folder contains example scripts demonstrating the menu structure. To try the demo:
-
-```bash
-./start-menu.py demo-scripts
-```
-
-Or rename it to `scripts/` to use as your default menu:
-
-```bash
-mv demo-scripts scripts
-./start-menu.py
-```
-
 ## Tips
 
 - **Quick access**: Bind `start-menu.py` to a keyboard shortcut or mouse gesture for instant access
