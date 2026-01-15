@@ -1,1 +1,0 @@
-/home/clay/ferguson/finance/python-model/develop.sh
