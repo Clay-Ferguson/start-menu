@@ -1,6 +1,8 @@
 # Linux Start Menu
 
-A lightweight GTK-based Windows-like start menu for Linux that launches shell scripts from a customizable folder structure.
+A lightweight GTK-based Windows-like start menu for Linux that launches shell scripts from a customizable folder structure. In the screenshot below you see start menu icon in the upper left corner, and it's been clicked to open and display the menu.
+
+![](screenshot.png)
 
 ## Overview
 
@@ -135,6 +137,21 @@ Exec=/path/to/start-menu.py my-custom-folder
 ```
 
 **Note:** The Configure option assumes you've installed Start Menu using `install.sh`. If you're running the script directly without installation, the `.desktop` file won't exist.
+
+## Demo Scripts
+
+The `demo-scripts/` folder contains example scripts demonstrating the menu structure. To try the demo:
+
+```bash
+./start-menu.py demo-scripts
+```
+
+Or rename it to `scripts/` to use as your default menu:
+
+```bash
+mv demo-scripts scripts
+./start-menu.py
+```
 
 ## Tips
 
