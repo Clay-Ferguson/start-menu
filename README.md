@@ -81,31 +81,7 @@ When `Terminal=true` is detected (case-insensitive, spaces ignored), the script 
 - Scripts with important output to review
 - Interactive tools and utilities
 
-## Desktop Icon Launcher
-
-The included `Menu.desktop` file demonstrates how to launch the menu from a desktop icon or application launcher.
-
-Example `.desktop` file:
-```ini
-[Desktop Entry]
-Name=Start Menu
-Comment=Script Launcher Menu
-Exec=/path/to/start-menu.py
-Icon=application-x-executable
-Terminal=false
-Type=Application
-Categories=Utility;
-```
-
-To install:
-1. Edit `Menu.desktop` and update the `Exec=` path to your installation location
-2. Copy to your desktop or applications folder:
-   ```bash
-   cp Menu.desktop ~/.local/share/applications/
-   ```
-3. You can also assign a keyboard shortcut to the `Exec` command in your desktop environment settings
-
-## Quick Install for GNOME/Ubuntu
+## Install for GNOME/Ubuntu
 
 For GNOME/Ubuntu users, you can automatically install Start Menu to your dock with a single command:
 
@@ -125,18 +101,6 @@ To remove Start Menu from the dock and applications menu:
 ```
 
 Note: The uninstall script only removes the desktop integration—your source files remain intact.
-
-## Configure Menu Item
-
-At the bottom of the menu, you'll find a **Configure** option. Clicking it opens the installed `.desktop` file (`~/.local/share/applications/start-menu.desktop`) in your default text editor.
-
-This allows you to easily change the scripts folder by modifying the `Exec=` line. For example, to use a different folder:
-
-```ini
-Exec=/path/to/start-menu.py my-custom-folder
-```
-
-**Note:** The Configure option assumes you've installed Start Menu using `install.sh`. If you're running the script directly without installation, the `.desktop` file won't exist.
 
 ## Tips
 

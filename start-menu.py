@@ -175,19 +175,6 @@ def on_menu_deactivate(menu):
     Gtk.main_quit()
 
 
-def open_configure(menu_item):
-    """Open the installed .desktop file in the default text editor"""
-    desktop_file = os.path.expanduser("~/.local/share/applications/start-menu.desktop")
-    if os.path.isfile(desktop_file):
-        subprocess.Popen(
-            ['xdg-open', desktop_file],
-            start_new_session=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-    Gtk.main_quit()
-
-
 def create_welcome_script(scripts_folder):
     """Create a default welcome.sh script in a newly created scripts folder"""
     os.makedirs(scripts_folder, exist_ok=True)
@@ -233,13 +220,6 @@ def main():
     
     # Build the menu
     menu = build_menu(SCRIPTS_FOLDER)
-    
-    # Add Configure option at the end of the top-level menu
-    menu.append(Gtk.SeparatorMenuItem())
-    configure_item = Gtk.MenuItem(label="Configure")
-    configure_item.connect('activate', open_configure)
-    menu.append(configure_item)
-    menu.show_all()
     
     menu.connect('deactivate', on_menu_deactivate)
     
