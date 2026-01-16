@@ -41,16 +41,42 @@ The menu is built entirely from the `scripts/` folder. **Your folder structure b
 
 ### Rules:
 - **Folders** become submenus
-- **Files** become clickable menu items
-- **File extensions** (`.sh`, `.bash`, `.py`, `.pl`, `.rb`) are hidden in the menu display
+- **Only `.sh` and `.txt` files** are recognized (other files are ignored)
+- **File extensions** (`.sh`, `.txt`) are hidden in the menu display
 - **Leading underscores** in filenames are stripped from the display name (useful for ordering)
 - **Hidden files** (starting with `.`) are ignored
 - Folders appear first, followed by a separator, then files (both sorted alphabetically)
 
 ## Supported File Types
 
-### Shell Scripts
-Place any executable script in the `scripts/` folder. If a script is not marked executable, it will be run with `bash`.
+Start Menu supports two types of files, each handled differently:
+
+### Shell Scripts (`.sh`)
+Shell scripts are executed as scripts. If a `.sh` file is not marked executable, it will be run with `bash`. Use shell scripts when you need:
+- Multi-step operations
+- Conditional logic or loops
+- Interactive terminal sessions (with `Terminal=true`)
+
+### Command Files (`.txt`)
+Text files are treated as simple command launchers. The entire content of the file is read, newlines are replaced with spaces, and the result is executed as a single shell command. These always run **silently in the background** (no terminal window).
+
+**Example:** Create `scripts/firefox.txt` containing:
+```
+firefox
+```
+
+**Multi-line commands:** You can split long commands across multiple lines for readability:
+```
+firefox
+--new-window
+https://github.com
+```
+This becomes: `firefox --new-window https://github.com`
+
+**Use cases for `.txt` files:**
+- Launching GUI applications (e.g., `firefox`, `gimp`, `code`)
+- Running simple one-liner commands
+- Creating quick shortcuts to applications with specific arguments
 
 ### File Links (Shortcuts)
 Symbolic links are fully supported. Create symlinks to scripts located elsewhere on your system:
@@ -107,6 +133,6 @@ Note: The uninstall script only removes the desktop integration—your source fi
 - **Quick access**: Bind `start-menu.py` to a keyboard shortcut or mouse gesture for instant access
 - **Organization**: Use folders to group related scripts (e.g., "Development", "System", "Media")
 - **Naming**: Use descriptive filenames since they become menu labels
-- **Ordering**: Prefix files with `_` to influence sort order while keeping clean display names
+
 
 

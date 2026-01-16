@@ -65,7 +65,7 @@ def apply_css():
 def clean_display_name(filename):
     """Remove common extensions for cleaner display"""
     name = filename
-    for ext in ['.sh', '.bash', '.py', '.pl', '.rb']:
+    for ext in ['.sh', '.txt']:
         if name.endswith(ext):
             name = name[:-len(ext)]
             break
@@ -85,6 +85,27 @@ def needs_terminal(script_path):
     except (IOError, UnicodeDecodeError):
         pass
     return False
+
+
+def run_command_file(menu_item, txt_path):
+    """Execute a command from a .txt file"""
+    try:
+        with open(txt_path, 'r') as f:
+            content = f.read()
+        # Replace newlines with spaces to create a single command
+        command = content.replace('\r', ' ').replace('\n', ' ').strip()
+        if command:
+            # Run the command in background without terminal
+            subprocess.Popen(
+                command,
+                shell=True,
+                start_new_session=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+    except (IOError, UnicodeDecodeError):
+        pass
+    Gtk.main_quit()
 
 
 def run_script(menu_item, script_path):
@@ -146,7 +167,9 @@ def build_menu(directory):
         if os.path.isdir(item_path):
             folders.append((item_name, item_path))
         elif os.path.isfile(item_path):
-            files.append((item_name, item_path))
+            # Only include .sh and .txt files
+            if item_name.endswith('.sh') or item_name.endswith('.txt'):
+                files.append((item_name, item_path))
     
     # Add folders as submenus
     for name, path in folders:
@@ -163,7 +186,11 @@ def build_menu(directory):
     for name, path in files:
         display_name = clean_display_name(name)
         menu_item = Gtk.MenuItem(label=display_name)
-        menu_item.connect('activate', run_script, path)
+        # Use appropriate handler based on file type
+        if name.endswith('.txt'):
+            menu_item.connect('activate', run_command_file, path)
+        else:
+            menu_item.connect('activate', run_script, path)
         menu.append(menu_item)
     
     menu.show_all()
