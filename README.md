@@ -6,7 +6,7 @@ A lightweight GTK-based Windows-like start menu for Linux that launches shell sc
 
 ## Overview
 
-This project provides a native popup menu that appears at your cursor position, built dynamically from the contents of the `scripts/` folder. Simply organize your scripts into folders, and the menu structure mirrors your file system hierarchy.
+This project provides a native popup menu that appears at your cursor position, built dynamically from the contents of the `scripts/` folder. Simply organize your scripts into folders, and the menu structure mirrors your file system hierarchy. The `scripts` folder in this project is just for testing and demonstration purposes; so when you run the `install.sh` you can specify the location of your own menu folder.
 
 ## Requirements
 
