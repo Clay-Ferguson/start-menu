@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=Start Menu
-Comment=Script Launcher Menu
-Exec=/home/clay/ferguson/projects/start-menu/start-menu.py
-Icon=/home/clay/ferguson/projects/start-menu/start-menu.png
-Terminal=false
-Type=Application
-Categories=Utility;
