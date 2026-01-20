@@ -1,6 +1,15 @@
 # Linux Start Menu
 
+[![Python 3](https://img.shields.io/badge/Python-3-3776ab?logo=python&logoColor=white)](start-menu.py)
+[![GTK 3](https://img.shields.io/badge/GTK-3-4a86cf?logo=gnome&logoColor=white)](start-menu.py)
+[![Linux](https://img.shields.io/badge/Platform-Linux-fcc624?logo=linux&logoColor=black)](README.md#requirements)
+[![Single File](https://img.shields.io/badge/Architecture-Single_File-green)](start-menu.py)
+[![Framework Free](https://img.shields.io/badge/Framework-Free-orange)](start-menu.py)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE.md)
+
 A lightweight GTK-based Windows-like start menu for Linux that launches shell scripts from a customizable folder structure. In the screenshot below you see start menu icon in the upper left corner, and it's been clicked to open and display the menu.
+
+The screenshot below shows only an example of what the menu could look like, which is based on the content of the example `scripts` folder in the project root. to build your own menu you'll create your own scripts folder, and it will look completely different from the screenshot below, because you'll have your own menu items defined, based on the file names and folder names in your own Scripts folder. 
 
 ![](screenshot.png)
 
