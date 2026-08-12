@@ -1,80 +1,54 @@
-# PyCommander menu definition.
-#
-# An item with `items:` is a section (a submenu); an item with `file:` or `sh:`
-# is launchable. Order here is the order on screen.
-#
-#   launch: terminal   fresh window; closes the moment the script exits — THE
-#                      DEFAULT, so it is only ever written out below to be
-#                      overridden
-#           hold       fresh window; held open until you press Enter
-#           detached   no terminal window at all; output discarded (GUI apps)
-#
-# Optional per-item keys: `icon:` (icon theme name or image path) and, on
-# launchable items, `cwd:` (defaults to the script's own directory for `file:`,
-# to $HOME for `sh:`).
-
-# Pressing 'e' opens this file in `editor`. It is a shell command, so it can
-# carry arguments (`code -n`). A GUI editor is assumed.
 options:
   editor: code
-
 menu:
-  - folder: Encryption
-    items:
-      - name: decrypt
-        file: ~/ferguson/scripts/encryption/decrypt_.sh
-      - name: encrypt
-        file: /home/clay/ferguson/scripts/encryption/encrypt_.sh
-
-  - folder: LLM Server
-    items:
-      - name: start-server
-        file: /home/clay/ferguson/commander/scripts/LLM Server/start-server_.sh
-      - name: status
-        file: /home/clay/ferguson/projects/llama-deck/status.sh
-        launch: hold
-      - name: stop-server
-        file: /home/clay/ferguson/projects/llama-deck/stop-server.sh
-        launch: hold
-
-  - folder: Maintenance
-    items:
-      - name: backup
-        file: /home/clay/ferguson/scripts/backup/backup.sh
-      - name: clean-images
-        file: /home/clay/ferguson/commander/scripts/Maintenance/clean-images_.sh
-      - name: extern-to-extern
-        file: /home/clay/ferguson/scripts/backup/extern-to-extern.sh
-
-  - folder: Passwords
-    items:
-      - name: edit-pass
-        file: /home/clay/ferguson/commander/scripts/Passwords/edit-pass_.sh
-      - name: pick-pass
-        file: /home/clay/ferguson/commander/scripts/Passwords/pick-pass_.sh
-
-  - folder: System
-    items:
-      # Inline commands, written straight into this file — no script needed.
-      - name: Memory
-        sh: free -h
-        launch: hold
-      - name: Disk space
-        launch: hold
-        sh: |
-          echo "Filesystem usage:"
-          df -h -x tmpfs -x devtmpfs -x efivarfs
-          echo
-          echo "Largest items in $HOME:"
-          du -h --max-depth=1 "$HOME" 2>/dev/null | sort -rh | head -10
-
-  - name: claude_code
-    file: /home/clay/ferguson/commander/scripts/claude_code_.sh
-
-  - name: Edit Finances
-    file: /home/clay/ferguson/commander/scripts/Edit Finances.sh
-    launch: detached
-
-  - name: Lingo Web
-    file: /home/clay/ferguson/commander/scripts/Lingo Web.sh
-    launch: detached
+- folder: Encryption
+  items:
+  - name: decrypt
+    file: ~/ferguson/scripts/encryption/decrypt_.sh
+  - name: encrypt
+    file: /home/clay/ferguson/scripts/encryption/encrypt_.sh
+- folder: LLM Server
+  items:
+  - name: start-server
+    file: /home/clay/ferguson/commander/scripts/LLM Server/start-server_.sh
+  - name: status
+    file: /home/clay/ferguson/projects/llama-deck/status.sh
+    launch: hold
+  - name: stop-server
+    file: /home/clay/ferguson/projects/llama-deck/stop-server.sh
+    launch: hold
+- folder: Maintenance
+  items:
+  - name: backup
+    file: /home/clay/ferguson/scripts/backup/backup.sh
+  - name: clean-images
+    file: /home/clay/ferguson/commander/scripts/Maintenance/clean-images_.sh
+  - name: extern-to-extern
+    file: /home/clay/ferguson/scripts/backup/extern-to-extern.sh
+- folder: Passwords
+  items:
+  - name: edit-pass
+    file: /home/clay/ferguson/commander/scripts/Passwords/edit-pass_.sh
+  - name: pick-pass
+    file: /home/clay/ferguson/commander/scripts/Passwords/pick-pass_.sh
+- folder: System
+  items:
+  - name: Memory
+    sh: free -h
+    launch: hold
+  - name: Disk space
+    sh: |
+      echo "Filesystem usage:"
+      df -h -x tmpfs -x devtmpfs -x efivarfs
+      echo
+      echo "Largest items in $HOME:"
+      du -h --max-depth=1 "$HOME" 2>/dev/null | sort -rh | head -10
+    launch: hold
+- name: claude_code
+  file: /home/clay/ferguson/commander/scripts/claude_code_.sh
+- name: Edit Finances
+  file: /home/clay/ferguson/commander/scripts/Edit Finances.sh
+  launch: detached
+- name: Lingo Web
+  file: /home/clay/ferguson/commander/scripts/Lingo Web.sh
+  launch: detached

@@ -10,32 +10,49 @@ from __future__ import annotations
 
 import os
 
-from PyQt6.QtCore import QModelIndex, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QIcon, QKeySequence, QShortcut, QStandardItem, QStandardItemModel
+from PyQt6.QtCore import QModelIndex, QRect, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import (
+    QIcon,
+    QKeySequence,
+    QPainter,
+    QPixmap,
+    QShortcut,
+    QStandardItem,
+    QStandardItemModel,
+)
 from PyQt6.QtWidgets import (
     QAbstractItemView,
+    QDialog,
     QLabel,
     QMessageBox,
     QStyle,
+    QStyledItemDelegate,
     QTreeView,
     QVBoxLayout,
     QWidget,
 )
 
-from . import APP_NAME
+from . import APP_NAME, UI_POINT_SIZE
+from .dialogs import RenameFolderDialog
 from .launcher import launch, open_in_editor
-from .menu import MenuNode, Options
+from .menu import MenuNode, Options, dump_menu
 
 NODE_ROLE = Qt.ItemDataRole.UserRole
 
 HINTS = "↑↓ move    → open    ← back    ⏎ launch    e edit menu    q quit"
 
-# A launcher is read at a glance from across the desk, not studied, so the menu
-# runs a few points above the desktop default with room around each row.
-MENU_POINT_SIZE = 15
+MENU_POINT_SIZE = UI_POINT_SIZE  # local alias: this file spells it out a lot
 ICON_SIZE = 28
 ROW_PADDING = 10  # px above and below each row's text
 TOOLTIP_LINES = 12  # of an inline sh snippet, before the tooltip is truncated
+
+# Right-justified per-row action icons (currently just "edit"). Slots are
+# numbered from the row's right edge, 0 = rightmost, so future icons (move
+# up/down) can take slots 1, 2, ... without moving this one.
+ACTION_ICON_SIZE = 20
+ACTION_ICON_MARGIN = 8  # px around and between icons
+ACTION_AREA_WIDTH = ACTION_ICON_MARGIN + ACTION_ICON_SIZE + ACTION_ICON_MARGIN
+EDIT_SLOT = 0
 
 # The desktop's own highlight color (Ubuntu's #E95420) is loud for something
 # you stare at while hunting a menu, so the selection bar is pinned to a
@@ -44,11 +61,50 @@ HIGHLIGHT_BG = "#9e4b2e"
 HIGHLIGHT_FG = "#ffffff"
 
 
+def _edit_icon() -> QIcon:
+    for name in ("document-edit", "gtk-edit", "accessories-text-editor"):
+        icon = QIcon.fromTheme(name)
+        if not icon.isNull():
+            return icon
+    # No icon theme has any of those (e.g. a bare desktop install): fall back
+    # to a drawn pencil glyph so the button is still visible.
+    pixmap = QPixmap(ACTION_ICON_SIZE, ACTION_ICON_SIZE)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    font = painter.font()
+    font.setPointSize(ACTION_ICON_SIZE - 8)
+    painter.setFont(font)
+    painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "✎")
+    painter.end()
+    return QIcon(pixmap)
+
+
+class RowActionDelegate(QStyledItemDelegate):
+    """Draws the right-justified action icon(s) on top of each normal row."""
+
+    def __init__(self, parent: QTreeView) -> None:
+        super().__init__(parent)
+        self._edit_icon = _edit_icon()
+
+    def paint(self, painter, option, index) -> None:
+        super().paint(painter, option, index)
+        self._edit_icon.paint(painter, self.icon_rect(option.rect, EDIT_SLOT))
+
+    @staticmethod
+    def icon_rect(row_rect: QRect, slot: int) -> QRect:
+        """Where slot `slot` (0 = rightmost) sits within `row_rect`."""
+        right = row_rect.right() - ACTION_ICON_MARGIN - slot * (ACTION_ICON_SIZE + ACTION_ICON_MARGIN)
+        top = row_rect.top() + (row_rect.height() - ACTION_ICON_SIZE) // 2
+        return QRect(right - ACTION_ICON_SIZE, top, ACTION_ICON_SIZE, ACTION_ICON_SIZE)
+
+
 class MenuTreeView(QTreeView):
     """One-level-at-a-time tree driven entirely by the arrow keys."""
 
     level_changed = pyqtSignal()
     launch_failed = pyqtSignal(str)
+    edit_requested = pyqtSignal(QModelIndex)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -64,7 +120,10 @@ class MenuTreeView(QTreeView):
         self.setFont(font)
         self.setStyleSheet(
             f"QTreeView {{ padding: 6px 0; }}"
-            f"QTreeView::item {{ padding: {ROW_PADDING}px 10px; }}"
+            # Extra right padding reserves room for the action icon(s) so
+            # a long name elides before it instead of running under them.
+            f"QTreeView::item {{ padding: {ROW_PADDING}px {ACTION_AREA_WIDTH}px"
+            f" {ROW_PADDING}px 10px; }}"
             # Both :active and :!active, so the bar keeps its color instead of
             # graying out whenever the window loses focus.
             f"QTreeView::item:selected {{"
@@ -77,6 +136,7 @@ class MenuTreeView(QTreeView):
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setItemDelegate(RowActionDelegate(self))
         self.doubleClicked.connect(self._activate)
 
     # -- model ---------------------------------------------------------------
@@ -160,6 +220,19 @@ class MenuTreeView(QTreeView):
             if error:
                 self.launch_failed.emit(error)
 
+    # -- mouse -----------------------------------------------------------
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            pos = event.position().toPoint()
+            index = self.indexAt(pos)
+            if index.isValid():
+                icon_rect = RowActionDelegate.icon_rect(self.visualRect(index), EDIT_SLOT)
+                if icon_rect.contains(pos):
+                    self.edit_requested.emit(index)
+                    return  # swallowed: a click on the icon isn't a selection
+        super().mousePressEvent(event)
+
     # -- keys ----------------------------------------------------------------
 
     def keyboardSearch(self, search: str) -> None:
@@ -185,6 +258,7 @@ class MainWindow(QWidget):
     def __init__(self, menu_path: str, nodes: list[MenuNode], options: Options) -> None:
         super().__init__()
         self.menu_path = menu_path
+        self.nodes = nodes
         self.options = options
 
         self.setWindowTitle(APP_NAME)
@@ -198,6 +272,7 @@ class MainWindow(QWidget):
         self.tree = MenuTreeView(self)
         self.tree.level_changed.connect(self._update_header)
         self.tree.launch_failed.connect(self._show_launch_error)
+        self.tree.edit_requested.connect(self._handle_edit_icon)
 
         footer = QLabel(HINTS)
         footer.setStyleSheet(f"font-size: {MENU_POINT_SIZE - 3}pt; padding: 10px 14px;")
@@ -232,6 +307,32 @@ class MainWindow(QWidget):
 
     def _show_launch_error(self, message: str) -> None:
         QMessageBox.critical(self, f"{APP_NAME} — launch failed", message)
+
+    def _handle_edit_icon(self, index: QModelIndex) -> None:
+        """The row's edit icon was clicked. Only folders have an editor so far."""
+        node = self.tree.node_at(index)
+        if node is None or not node.is_section:
+            return  # scripts: no editor yet, ignore the click
+        dialog = RenameFolderDialog(node.name, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        new_name = dialog.new_name()
+        if not new_name or new_name == node.name:
+            return
+        node.name = new_name
+        item = self.tree.model().itemFromIndex(index)
+        if item is not None:
+            item.setText(new_name)
+        error = self._save_menu()
+        if error:
+            QMessageBox.critical(self, f"{APP_NAME} — cannot save menu", error)
+
+    def _save_menu(self) -> str | None:
+        try:
+            dump_menu(self.menu_path, self.nodes, self.options)
+        except OSError as exc:
+            return f"Could not write {self.menu_path}:\n\n{exc}"
+        return None
 
     def edit_menu(self) -> None:
         """Open the menu file itself in the configured editor.

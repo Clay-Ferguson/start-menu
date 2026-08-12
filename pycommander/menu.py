@@ -239,6 +239,63 @@ def _parse_node(raw, where: str, errors: list[str]) -> MenuNode | None:
     return MenuNode(name=name, icon=icon, file=file, sh=sh, launch=launch, cwd=cwd)
 
 
+class _MenuDumper(yaml.SafeDumper):
+    """SafeDumper with one addition: multi-line strings dump as `|` blocks.
+
+    Without this, an inline `sh:` snippet with newlines would come back out
+    as a quoted string full of literal "\\n"s instead of the readable block
+    style the file uses elsewhere.
+    """
+
+
+def _represent_str(dumper: yaml.Dumper, data: str):
+    style = "|" if "\n" in data else None
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=style)
+
+
+_MenuDumper.add_representer(str, _represent_str)
+
+
+def _node_to_dict(node: MenuNode) -> dict:
+    """The inverse of `_parse_node`: a MenuNode back to a plain dict."""
+    if node.is_section:
+        d: dict = {"folder": node.name}
+        if node.icon:
+            d["icon"] = node.icon
+        d["items"] = [_node_to_dict(child) for child in node.children]
+        return d
+
+    d = {"name": node.name}
+    if node.icon:
+        d["icon"] = node.icon
+    if node.file is not None:
+        d["file"] = node.file
+    else:
+        d["sh"] = node.sh
+    if node.launch != DEFAULT_LAUNCH:
+        d["launch"] = node.launch
+    if node.cwd:
+        d["cwd"] = node.cwd
+    return d
+
+
+def dump_menu(path: str, nodes: list[MenuNode], options: Options) -> None:
+    """Write `nodes`/`options` back out to `path` as YAML.
+
+    This is a full rewrite from the in-memory tree, not an edit of the
+    existing file: it uses plain PyYAML rather than a round-trip-preserving
+    library, so any comments or hand-formatting in the current file are lost
+    once this runs. That trade-off was made deliberately to avoid a second
+    YAML dependency.
+    """
+    data: dict = {}
+    if options.editor:
+        data["options"] = {"editor": options.editor}
+    data["menu"] = [_node_to_dict(node) for node in nodes]
+    with open(path, "w", encoding="utf-8") as f:
+        yaml.dump(data, f, Dumper=_MenuDumper, sort_keys=False, allow_unicode=True)
+
+
 def _kind(value) -> str:
     if value is None:
         return "nothing"
