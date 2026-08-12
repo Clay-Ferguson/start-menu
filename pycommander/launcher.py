@@ -28,17 +28,16 @@ TERMINALS = ("gnome-terminal", "konsole", "xfce4-terminal", "x-terminal-emulator
 
 def launch(node: MenuNode) -> str | None:
     """Run `node`'s script. Returns an error message, or None on success."""
-    path = node.resolved_file
-    if path is None:
+    if node.is_section:
         return f"'{node.name}' is a section, not a script."
-    if not os.path.isfile(path):
-        return f"Cannot launch '{node.name}':\n\n{path}\n\nNo such file."
+    if node.file is not None and not os.path.isfile(node.resolved_file):
+        return f"Cannot launch '{node.name}':\n\n{node.resolved_file}\n\nNo such file."
 
     cwd = node.resolved_cwd
     if not os.path.isdir(cwd):
         return f"Cannot launch '{node.name}':\n\nWorking directory does not exist:\n{cwd}"
 
-    cmd = build_command(path, cwd, node.launch)
+    cmd = build_command(node)
 
     if node.launch == LAUNCH_DETACHED:
         argv = ["bash", "-lc", cmd]
@@ -57,26 +56,55 @@ def launch(node: MenuNode) -> str | None:
     return None
 
 
-def build_command(path: str, cwd: str, mode: str) -> str:
-    """The bash -c command line that runs `path` from `cwd` under `mode`."""
-    # A script without the execute bit still runs, just under an explicit bash.
-    runner = shlex.quote(path)
-    if not os.access(path, os.X_OK):
-        runner = f"bash {runner}"
-    cd = f"cd {shlex.quote(cwd)} && "
+def build_command(node: MenuNode) -> str:
+    """The `bash -c` program that runs `node` under its launch mode.
 
-    if mode != LAUNCH_HOLD:
-        return f"{cd}exec {runner}"
+    An inline `sh` snippet needs no file on disk: bash -c takes a whole
+    multi-line program just as happily as a one-liner, and the shell running
+    it *is* the terminal's only process, so the launch modes behave exactly as
+    they do for a real script file.
+    """
+    hold = node.launch == LAUNCH_HOLD
+    cd = f"cd {shlex.quote(node.resolved_cwd)} || exit 1"
 
-    # Deliberately no exec here: the script would become the terminal's only
-    # process, so a script that finishes quickly (or fails) would take the
-    # window down with it before its output could be read. Keeping a shell
-    # behind it holds the window open until the user dismisses it.
-    return (
-        f"{cd}{runner}; rc=$?; "
-        f"printf '\\n[pycommander] %s exited with status %s — press Enter to close…' "
-        f"{shlex.quote(os.path.basename(path))} \"$rc\"; read -r"
-    )
+    if node.sh is not None:
+        label = node.name
+        body = node.sh.rstrip("\n")
+        if hold:
+            # Parenthesised so a bare `exit` in the snippet ends the snippet
+            # rather than the whole shell, which would skip the epilogue below
+            # and drop the window. A real script file gets this for free by
+            # running as its own process. The "(" rides on the cd's line so
+            # bash's reported line numbers stay a constant +1 off the snippet.
+            lines = [f"{cd}; (", body, ")"]
+        else:
+            lines = [cd, body]
+    else:
+        path = node.resolved_file
+        label = os.path.basename(path)
+        # A script without the execute bit still runs, just under an explicit bash.
+        runner = shlex.quote(path)
+        if not os.access(path, os.X_OK):
+            runner = f"bash {runner}"
+        # `exec` hands the terminal straight to the script, so the window's
+        # lifetime is the script's — except under `hold`, below.
+        lines = [cd, runner if hold else f"exec {runner}"]
+
+    if hold:
+        # Deliberately nothing exec'd above: the script would become the
+        # terminal's only process, so one that finishes quickly (or fails)
+        # would take the window down with it before its output could be read.
+        # Keeping a shell behind it holds the window open until dismissed.
+        # Joined by newlines rather than ';' so a snippet whose last line is a
+        # comment doesn't swallow the epilogue.
+        lines += [
+            "rc=$?",
+            "printf '\\n[pycommander] %s exited with status %s — press Enter to close…' "
+            f"{shlex.quote(label)} \"$rc\"",
+            "read -r",
+        ]
+
+    return "\n".join(lines)
 
 
 def _terminal_argv(cmd: str, title: str) -> list[str] | None:

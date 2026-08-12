@@ -22,23 +22,27 @@ LAUNCH_MODES = (LAUNCH_DETACHED, LAUNCH_TERMINAL, LAUNCH_HOLD)
 DEFAULT_LAUNCH = LAUNCH_TERMINAL
 
 SECTION_KEYS = {"name", "icon", "items"}
-SCRIPT_KEYS = {"name", "icon", "file", "launch", "cwd"}
+SCRIPT_KEYS = {"name", "icon", "file", "sh", "launch", "cwd"}
 
 
 @dataclass
 class MenuNode:
-    """One menu entry: either a section with children or a launchable script."""
+    """One menu entry: a section with children, or a launchable script.
+
+    A script is either a `file` on disk or an inline `sh` snippet — never both.
+    """
 
     name: str
     icon: str | None = None
     file: str | None = None
+    sh: str | None = None
     launch: str = DEFAULT_LAUNCH
     cwd: str | None = None
     children: list["MenuNode"] = field(default_factory=list)
 
     @property
     def is_section(self) -> bool:
-        return self.file is None
+        return self.file is None and self.sh is None
 
     @property
     def resolved_file(self) -> str | None:
@@ -49,12 +53,19 @@ class MenuNode:
 
     @property
     def resolved_cwd(self) -> str | None:
-        """Working directory for the launch: `cwd` if given, else the script's own."""
-        if self.file is None:
+        """Working directory: `cwd` if given, else a sensible default.
+
+        A `file` script runs from its own directory, the way Commander ran it.
+        An inline `sh` snippet has no directory of its own, so it starts in
+        $HOME — the same place a freshly opened terminal would.
+        """
+        if self.is_section:
             return None
         if self.cwd:
             return _expand(self.cwd)
-        return os.path.dirname(self.resolved_file)
+        if self.file is not None:
+            return os.path.dirname(self.resolved_file)
+        return os.path.expanduser("~")
 
 
 def _expand(path: str) -> str:
@@ -125,17 +136,22 @@ def _parse_node(raw, where: str, errors: list[str]) -> MenuNode | None:
     label = f"{where} ({name})"
     has_items = "items" in raw
     has_file = "file" in raw
+    has_sh = "sh" in raw
 
-    if has_items and has_file:
+    # Exactly one of the three decides what this item is.
+    present = [k for k, ok in (("items", has_items), ("file", has_file), ("sh", has_sh)) if ok]
+    if len(present) > 1:
+        clashing = _join_and([f"'{k}:'" for k in present])
         errors.append(
-            f"{label}: has both 'items:' and 'file:' — an item is either a "
-            f"section (items) or a script (file), not both."
+            f"{label}: has {clashing} together — an item is either a section "
+            f"('items:'), a script file ('file:'), or an inline snippet ('sh:'), "
+            f"and only one of those."
         )
         return None
-    if not has_items and not has_file:
+    if not present:
         errors.append(
-            f"{label}: has neither 'items:' nor 'file:' — add 'items:' to make "
-            f"it a section or 'file:' to make it a launchable script."
+            f"{label}: has none of 'items:', 'file:' or 'sh:' — add 'items:' to make "
+            f"it a section, or 'file:'/'sh:' to make it launchable."
         )
         return None
 
@@ -153,10 +169,19 @@ def _parse_node(raw, where: str, errors: list[str]) -> MenuNode | None:
         children = _parse_list(raw["items"], f"{where}.items", errors)
         return MenuNode(name=name, icon=icon, children=children)
 
-    file = raw["file"]
-    if not isinstance(file, str) or not file.strip():
-        errors.append(f"{label}: 'file:' must be a non-empty path, got {_kind(file)}.")
-        return None
+    file = sh = None
+    if has_file:
+        file = raw["file"]
+        if not isinstance(file, str) or not file.strip():
+            errors.append(f"{label}: 'file:' must be a non-empty path, got {_kind(file)}.")
+            return None
+    else:
+        sh = raw["sh"]
+        if not isinstance(sh, str) or not sh.strip():
+            errors.append(
+                f"{label}: 'sh:' must be non-empty shell commands, got {_kind(sh)}."
+            )
+            return None
 
     launch = raw.get("launch", DEFAULT_LAUNCH)
     if not isinstance(launch, str) or launch not in LAUNCH_MODES:
@@ -170,7 +195,7 @@ def _parse_node(raw, where: str, errors: list[str]) -> MenuNode | None:
         errors.append(f"{label}: 'cwd:' must be text, got {_kind(cwd)}.")
         cwd = None
 
-    return MenuNode(name=name, icon=icon, file=file, launch=launch, cwd=cwd)
+    return MenuNode(name=name, icon=icon, file=file, sh=sh, launch=launch, cwd=cwd)
 
 
 def _kind(value) -> str:
@@ -188,3 +213,8 @@ def _kind(value) -> str:
 
 def _join(values) -> str:
     return ", ".join(sorted(values))
+
+
+def _join_and(values) -> str:
+    values = list(values)
+    return f"{', '.join(values[:-1])} and {values[-1]}"

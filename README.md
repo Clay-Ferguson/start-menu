@@ -41,9 +41,10 @@ a row. Launched scripts run in their own session and survive quitting.
 
 ## The menu file
 
-Top-level key `menu:` holds a list of items. An item with `items:` is a
-**section**; an item with `file:` is a **script**. Items appear in the order you
-write them — there is no sorting.
+Top-level key `menu:` holds a list of items. Every item is exactly one of three
+things, decided by which key it carries: `items:` makes it a **section**,
+`file:` a **script on disk**, and `sh:` an **inline snippet**. Items appear in
+the order you write them — there is no sorting.
 
 ```yaml
 menu:
@@ -57,6 +58,13 @@ menu:
         file: ~/ferguson/projects/llama-deck/status.sh
         launch: hold
 
+  - name: Disk report                # inline: no script file needed
+    launch: hold
+    sh: |
+      echo "Free space:"
+      df -h /
+      docker ps --format '{{.Names}}'
+
   - name: Lingo Web
     file: /home/clay/ferguson/commander/scripts/Lingo Web.sh
     launch: detached
@@ -64,12 +72,32 @@ menu:
 
 | Key | Applies to | Required | Meaning |
 |---|---|---|---|
-| `name` | both | yes | The label shown in the menu |
+| `name` | all | yes | The label shown in the menu |
 | `items` | section | yes | The child items |
-| `file` | script | yes | Path to the shell script. `~` and `$VARS` are expanded and symlinks resolved |
+| `file` | script | one of | Path to a shell script. `~` and `$VARS` are expanded and symlinks resolved |
+| `sh` | script | `file`/`sh` | Shell commands written inline, one line or many |
 | `launch` | script | no | How to run it (see below). Default `terminal` |
-| `cwd` | script | no | Working directory. Defaults to the script's own directory |
-| `icon` | both | no | An icon theme name (`utilities-terminal`) or a path to an image file. Defaults to a folder icon for sections, a file icon for scripts |
+| `cwd` | script | no | Working directory. Defaults to the script's own directory for `file:`, to `$HOME` for `sh:` |
+| `icon` | all | no | An icon theme name (`utilities-terminal`) or a path to an image file. Defaults to a folder icon for sections, a file icon for scripts |
+
+### Inline `sh:` snippets
+
+Use YAML's `|` block scalar for anything longer than one line — it preserves
+newlines exactly. (`>` folds them into spaces, which is almost never what you
+want for shell code.) There is no temp file involved: the snippet is handed
+straight to `bash -lc` as a whole program, and the shell running it *is* the
+terminal's only process, so all three `launch:` modes behave exactly as they do
+for a real script file.
+
+Two things to know:
+
+- **It is bash, not a shebang.** A `#!/usr/bin/env python3` first line is just a
+  comment; the body always runs under bash. And no flags are set for you — if
+  you want `set -euo pipefail`, write it as the first line, the same as you
+  would in a real script.
+- **Error line numbers are off by one.** Bash counts from the start of the
+  program it was handed, and line 1 is the `cd` that puts you in `cwd`, so a
+  failure on your snippet's line 3 reports as `bash: line 4:`.
 
 ### Launch modes
 
@@ -85,7 +113,9 @@ These are the same three behaviors Commander spelled as no suffix, `_`, and
 Scripts always run under `bash -lc` (a *login* shell), so they see the same
 `PATH` and profile they would get from a real terminal rather than the
 stripped-down desktop-session environment. A script without the execute bit
-still runs — it just gets an explicit `bash` in front of it.
+still runs — it just gets an explicit `bash` in front of it. An `sh:` snippet
+under `hold` runs parenthesised, so a bare `exit` in it ends the snippet rather
+than the window, and you still get the exit status and the pause.
 
 For `terminal` and `hold`, the first available terminal emulator is used, in
 this order: `gnome-terminal`, `konsole`, `xfce4-terminal`,

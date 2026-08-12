@@ -35,6 +35,7 @@ HINTS = "↑↓ move    → open    ← back    ⏎ launch    F5 reload    q qui
 MENU_POINT_SIZE = 15
 ICON_SIZE = 28
 ROW_PADDING = 10  # px above and below each row's text
+TOOLTIP_LINES = 12  # of an inline sh snippet, before the tooltip is truncated
 
 # The desktop's own highlight color (Ubuntu's #E95420) is loud for something
 # you stare at while hunting a menu, so the selection bar is pinned to a
@@ -99,7 +100,7 @@ class MenuTreeView(QTreeView):
             item.setSelectable(True)
             item.setIcon(self._icon_for(node))
             item.setData(node, NODE_ROLE)
-            item.setToolTip(node.resolved_file or f"{len(node.children)} items")
+            item.setToolTip(_tooltip(node))
             parent.appendRow(item)
             if node.is_section:
                 self._populate(item, node.children)
@@ -295,6 +296,18 @@ class MainWindow(QWidget):
         self.tree.set_nodes(nodes)
         self.tree.restore_path(path)
         self.tree.setFocus()
+
+
+def _tooltip(node: MenuNode) -> str:
+    """What the item points at: a path, the snippet itself, or a child count."""
+    if node.sh is not None:
+        lines = node.sh.strip().splitlines()
+        if len(lines) > TOOLTIP_LINES:
+            lines = lines[:TOOLTIP_LINES] + [f"… {len(lines) - TOOLTIP_LINES} more lines"]
+        return "\n".join(lines)
+    if node.file is not None:
+        return node.resolved_file
+    return f"{len(node.children)} items"
 
 
 def format_errors(menu_path: str, errors: list[str]) -> str:
