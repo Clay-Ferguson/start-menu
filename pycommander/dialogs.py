@@ -1,6 +1,7 @@
 """Editing dialogs opened from the tree's per-row action icons.
 
-One dialog class per editable thing. Today that's just a folder's name;
+One dialog class per editable thing. Today that's just a folder's name —
+shared between renaming an existing folder and naming a brand new one — plus
 script items (name, file/sh, launch, cwd) and item reordering are meant to
 grow into dialogs here too.
 """
@@ -28,12 +29,16 @@ LABEL_STYLE = f"font-size: {UI_POINT_SIZE}pt;"
 BUTTON_STYLE = f"QPushButton {{ font-size: {UI_POINT_SIZE}pt; padding: 8px 20px; }}"
 
 
-class RenameFolderDialog(QDialog):
-    """A single text field for renaming a section ('folder:') entry."""
+class FolderNameDialog(QDialog):
+    """A single text field for naming a section ('folder:') entry.
 
-    def __init__(self, current_name: str, parent: QWidget | None = None) -> None:
+    Reused for both renaming an existing folder and naming a new one — the
+    `title` decides which, since the field itself is identical either way.
+    """
+
+    def __init__(self, current_name: str, parent: QWidget | None = None, title: str = "Rename") -> None:
         super().__init__(parent)
-        self.setWindowTitle("Rename")
+        self.setWindowTitle(title)
         self.setModal(True)
         self.resize(440, 220)
 

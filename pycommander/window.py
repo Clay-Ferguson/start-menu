@@ -28,6 +28,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMessageBox,
+    QPushButton,
     QStyle,
     QStyledItemDelegate,
     QTreeView,
@@ -36,7 +37,7 @@ from PyQt6.QtWidgets import (
 )
 
 from . import APP_NAME, UI_POINT_SIZE
-from .dialogs import RenameFolderDialog
+from .dialogs import FolderNameDialog
 from .launcher import launch, open_in_editor
 from .menu import MenuNode, Options, dump_menu, load_menu
 
@@ -416,8 +417,24 @@ class MainWindow(QWidget):
         self.tree.move_up_requested.connect(lambda index: self._handle_move(index, -1))
         self.tree.move_down_requested.connect(lambda index: self._handle_move(index, 1))
 
+        self.edit_toolbar = QWidget()
+        edit_toolbar_layout = QHBoxLayout(self.edit_toolbar)
+        edit_toolbar_layout.setContentsMargins(14, 8, 14, 8)
+        edit_toolbar_layout.setSpacing(8)
+        new_folder_button = QPushButton("New Folder")
+        new_folder_button.setStyleSheet(f"font-size: {MENU_POINT_SIZE - 3}pt; padding: 4px 12px;")
+        new_folder_button.clicked.connect(self._handle_new_folder)
+        new_item_button = QPushButton("New Item")
+        new_item_button.setStyleSheet(f"font-size: {MENU_POINT_SIZE - 3}pt; padding: 4px 12px;")
+        # TODO: wire up once item (script) creation has a dialog of its own.
+        edit_toolbar_layout.addWidget(new_folder_button)
+        edit_toolbar_layout.addWidget(new_item_button)
+        edit_toolbar_layout.addStretch(1)
+        self.edit_toolbar.setVisible(False)  # only shown while edit mode is on
+
         self.edit_toggle = ToggleSwitch(self)
         self.edit_toggle.toggled.connect(self.tree.set_edit_mode)
+        self.edit_toggle.toggled.connect(self.edit_toolbar.setVisible)
 
         edit_label = QLabel("Edit")
         edit_label.setStyleSheet(f"font-size: {MENU_POINT_SIZE - 3}pt;")
@@ -439,6 +456,7 @@ class MainWindow(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(self.header)
+        layout.addWidget(self.edit_toolbar)
         layout.addWidget(self.tree, 1)
         layout.addWidget(footer)
 
@@ -470,7 +488,7 @@ class MainWindow(QWidget):
         node = self.tree.node_at(index)
         if node is None or not node.is_section:
             return  # scripts: no editor yet, ignore the click
-        dialog = RenameFolderDialog(node.name, self)
+        dialog = FolderNameDialog(node.name, self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         new_name = dialog.new_name()
@@ -478,6 +496,35 @@ class MainWindow(QWidget):
             return
         node.name = new_name
         self._save_and_reload()
+
+    def _handle_new_folder(self) -> None:
+        """The toolbar's "New Folder" button was clicked.
+
+        The new folder is appended to whichever level is currently on
+        screen — `self.nodes` at the top, or the section we've drilled into
+        — starting out empty; the user can descend into it with Right, but
+        there's no way to populate it until "New Item" exists.
+        """
+        dialog = FolderNameDialog("", self, title="New Folder Name")
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        name = dialog.new_name()
+        if not name:
+            return
+        self._current_level_nodes().append(MenuNode(name=name))
+        self._save_and_reload(select_name=name)
+
+    def _current_level_nodes(self) -> list[MenuNode]:
+        """The MenuNode list for the level currently shown in the tree.
+
+        `self.nodes` at the top level, or the section's `children` once
+        we've drilled in — found by walking `self.nodes` down the same
+        row-path `current_path()` describes.
+        """
+        nodes = self.nodes
+        for row in self.tree.current_path():
+            nodes = nodes[row].children
+        return nodes
 
     def _handle_move(self, index: QModelIndex, delta: int) -> None:
         """The row's move up/down icon was clicked; `delta` is -1 or +1."""
@@ -506,17 +553,20 @@ class MainWindow(QWidget):
             siblings = siblings[row].children
         return siblings
 
-    def _save_and_reload(self) -> None:
+    def _save_and_reload(self, select_name: str | None = None) -> None:
         """Write `self.nodes`/`options` out, then reload from disk.
 
         Rather than patch the tree view's model in place, this takes the
         same one-way trip through `load_menu` that startup does — simpler
         to get right, and it guarantees the GUI matches what's actually on
-        disk. The user's current folder and highlighted row are both
-        preserved across the rebuild.
+        disk. The user's current folder is preserved across the rebuild, and
+        so is the highlighted row — `select_name`, when given, picks out a
+        row that wasn't already highlighted (e.g. one just created); left
+        unset, whatever was highlighted before stays highlighted.
         """
         path = self.tree.current_path()
-        select_name = self.tree.current_selection_name()
+        if select_name is None:
+            select_name = self.tree.current_selection_name()
         try:
             dump_menu(self.menu_path, self.nodes, self.options)
         except OSError as exc:

@@ -144,11 +144,11 @@ def _parse_options(raw, errors: list[str]) -> Options:
     return Options(editor=editor)
 
 
-def _parse_list(raw, where: str, errors: list[str]) -> list[MenuNode]:
+def _parse_list(raw, where: str, errors: list[str], allow_empty: bool = False) -> list[MenuNode]:
     if not isinstance(raw, list):
         errors.append(f"{where}: expected a list of items, got {_kind(raw)}.")
         return []
-    if not raw:
+    if not raw and not allow_empty:
         errors.append(f"{where}: is empty; a section needs at least one item.")
         return []
     return [
@@ -207,7 +207,10 @@ def _parse_node(raw, where: str, errors: list[str]) -> MenuNode | None:
         errors.append(f"{label}: '{key}:' is not valid on a {kind}; allowed keys are {_join(allowed)}.")
 
     if has_items:
-        children = _parse_list(raw["items"], f"{where}.items", errors)
+        # Unlike the top-level menu, a section is allowed to be empty — that's
+        # exactly the state a freshly created folder is in before it gets its
+        # first item.
+        children = _parse_list(raw["items"], f"{where}.items", errors, allow_empty=True)
         return MenuNode(name=name, icon=icon, children=children)
 
     file = sh = None
