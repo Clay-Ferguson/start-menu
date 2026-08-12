@@ -38,7 +38,7 @@ from PyQt6.QtWidgets import (
 from . import APP_NAME, UI_POINT_SIZE
 from .dialogs import RenameFolderDialog
 from .launcher import launch, open_in_editor
-from .menu import MenuNode, Options, dump_menu
+from .menu import MenuNode, Options, dump_menu, load_menu
 
 NODE_ROLE = Qt.ItemDataRole.UserRole
 
@@ -49,13 +49,16 @@ ICON_SIZE = 28
 ROW_PADDING = 10  # px above and below each row's text
 TOOLTIP_LINES = 12  # of an inline sh snippet, before the tooltip is truncated
 
-# Right-justified per-row action icons (currently just "edit"). Slots are
-# numbered from the row's right edge, 0 = rightmost, so future icons (move
-# up/down) can take slots 1, 2, ... without moving this one.
+# Right-justified per-row action icons. Slots are numbered from the row's
+# right edge, 0 = rightmost, so new icons can join without moving the old
+# ones. Left to right on screen: move up, move down, edit.
 ACTION_ICON_SIZE = 20
 ACTION_ICON_MARGIN = 8  # px around and between icons
-ACTION_AREA_WIDTH = ACTION_ICON_MARGIN + ACTION_ICON_SIZE + ACTION_ICON_MARGIN
 EDIT_SLOT = 0
+DOWN_SLOT = 1
+UP_SLOT = 2
+ACTION_SLOT_COUNT = 3
+ACTION_AREA_WIDTH = ACTION_ICON_MARGIN + ACTION_SLOT_COUNT * (ACTION_ICON_SIZE + ACTION_ICON_MARGIN)
 
 # The desktop's own highlight color (Ubuntu's #E95420) is loud for something
 # you stare at while hunting a menu, so the selection bar is pinned to a
@@ -84,20 +87,29 @@ def _edit_icon() -> QIcon:
 
 
 class RowActionDelegate(QStyledItemDelegate):
-    """Draws the right-justified action icon(s) on top of each normal row.
+    """Draws the right-justified action icon(s) on top of the current row.
 
-    Only while the view's edit mode is on — otherwise the row paints exactly
-    as it did before this feature existed.
+    Only while the view's edit mode is on, and only on the highlighted row —
+    otherwise the row paints exactly as it did before this feature existed.
+    Which icons apply to a given row (an item at the top of its level has no
+    "up", etc.) is decided by the view's `visible_action_slots`, not here.
     """
 
     def __init__(self, parent: QTreeView) -> None:
         super().__init__(parent)
-        self._edit_icon = _edit_icon()
+        self._icons = {
+            "edit": _edit_icon(),
+            "up": parent.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp),
+            "down": parent.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown),
+        }
 
     def paint(self, painter, option, index) -> None:
         super().paint(painter, option, index)
-        if getattr(self.parent(), "edit_mode", False):
-            self._edit_icon.paint(painter, self.icon_rect(option.rect, EDIT_SLOT))
+        view = self.parent()
+        if not getattr(view, "edit_mode", False) or index != view.currentIndex():
+            return
+        for slot, kind in view.visible_action_slots(index).items():
+            self._icons[kind].paint(painter, self.icon_rect(option.rect, slot))
 
     @staticmethod
     def icon_rect(row_rect: QRect, slot: int) -> QRect:
@@ -143,6 +155,11 @@ class MenuTreeView(QTreeView):
     level_changed = pyqtSignal()
     launch_failed = pyqtSignal(str)
     edit_requested = pyqtSignal(QModelIndex)
+    move_up_requested = pyqtSignal(QModelIndex)
+    move_down_requested = pyqtSignal(QModelIndex)
+
+    # Which signal to emit for each action kind `visible_action_slots` hands out.
+    _ACTION_SIGNALS = {"edit": "edit_requested", "up": "move_up_requested", "down": "move_down_requested"}
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -190,14 +207,85 @@ class MenuTreeView(QTreeView):
 
     # -- model ---------------------------------------------------------------
 
-    def set_nodes(self, nodes: list[MenuNode]) -> None:
-        """Build the model from the menu tree and show the top level."""
+    def set_nodes(
+        self,
+        nodes: list[MenuNode],
+        restore_path: list[int] | None = None,
+        select_name: str | None = None,
+    ) -> None:
+        """Build the model from the menu tree.
+
+        With no `restore_path`, this is a fresh load: show the top level.
+        With one — as after an edit that rewrote the file and reloaded it —
+        descend back to the same folder instead of landing back at the top,
+        and highlight `select_name` there instead of always the first row —
+        a move only reorders rows, so the item that was highlighted (which
+        may not even be the one that moved) needs to be found by name, not
+        by the row position it used to be at.
+        """
         model = QStandardItemModel(self)
         self._populate(model.invisibleRootItem(), nodes)
         self.setModel(model)
-        self.setRootIndex(QModelIndex())
-        self._select_first()
+        if restore_path is not None:
+            self._restore_path(restore_path, select_name)
+        else:
+            self.setRootIndex(QModelIndex())
+            self._select_first()
+            self.level_changed.emit()
+
+    def current_path(self) -> list[int]:
+        """Row numbers from the top level down to the current folder.
+
+        The inverse of `_restore_path`: capture this before an edit rebuilds
+        the model, then hand it back to `set_nodes` to return to the same
+        place.
+        """
+        rows: list[int] = []
+        index = self.rootIndex()
+        while index.isValid():
+            rows.insert(0, index.row())
+            index = index.parent()
+        return rows
+
+    def current_selection_name(self) -> str | None:
+        """The highlighted row's name, to hand to `set_nodes` as `select_name`."""
+        node = self.node_at(self.currentIndex())
+        return node.name if node is not None else None
+
+    def _restore_path(self, path: list[int], select_name: str | None) -> None:
+        index = QModelIndex()
+        for row in path:
+            child = self.model().index(row, 0, index)
+            if not child.isValid():
+                break  # the path no longer exists; land as deep as it goes
+            index = child
+        self.setRootIndex(index)
+        self._select_by_name(select_name)
         self.level_changed.emit()
+
+    def _select_by_name(self, name: str | None) -> None:
+        if name is not None:
+            for row in range(self.model().rowCount(self.rootIndex())):
+                candidate = self.model().index(row, 0, self.rootIndex())
+                if candidate.data(Qt.ItemDataRole.DisplayRole) == name:
+                    self.setCurrentIndex(candidate)
+                    return
+        self._select_first()  # no name given, or it's no longer in this level
+
+    def visible_action_slots(self, index: QModelIndex) -> dict[int, str]:
+        """Which action icons apply to `index`'s row, and each one's slot.
+
+        The first item in a level has no "up" and the last has no "down" —
+        there's nowhere for either to go.
+        """
+        slots: dict[int, str] = {EDIT_SLOT: "edit"}
+        row = index.row()
+        count = self.model().rowCount(index.parent())
+        if row > 0:
+            slots[UP_SLOT] = "up"
+        if row < count - 1:
+            slots[DOWN_SLOT] = "down"
+        return slots
 
     def _populate(self, parent: QStandardItem, nodes: list[MenuNode]) -> None:
         for node in nodes:
@@ -275,11 +363,14 @@ class MenuTreeView(QTreeView):
         if self.edit_mode and event.button() == Qt.MouseButton.LeftButton:
             pos = event.position().toPoint()
             index = self.indexAt(pos)
-            if index.isValid():
-                icon_rect = RowActionDelegate.icon_rect(self.visualRect(index), EDIT_SLOT)
-                if icon_rect.contains(pos):
-                    self.edit_requested.emit(index)
-                    return  # swallowed: a click on the icon isn't a selection
+            # Action icons are only drawn on the current row, so only that
+            # row's click can land on one; elsewhere this is a plain select.
+            if index.isValid() and index == self.currentIndex():
+                row_rect = self.visualRect(index)
+                for slot, kind in self.visible_action_slots(index).items():
+                    if RowActionDelegate.icon_rect(row_rect, slot).contains(pos):
+                        getattr(self, self._ACTION_SIGNALS[kind]).emit(index)
+                        return  # swallowed: a click on an icon isn't a selection
         super().mousePressEvent(event)
 
     # -- keys ----------------------------------------------------------------
@@ -322,6 +413,8 @@ class MainWindow(QWidget):
         self.tree.level_changed.connect(self._update_header)
         self.tree.launch_failed.connect(self._show_launch_error)
         self.tree.edit_requested.connect(self._handle_edit_icon)
+        self.tree.move_up_requested.connect(lambda index: self._handle_move(index, -1))
+        self.tree.move_down_requested.connect(lambda index: self._handle_move(index, 1))
 
         self.edit_toggle = ToggleSwitch(self)
         self.edit_toggle.toggled.connect(self.tree.set_edit_mode)
@@ -384,19 +477,63 @@ class MainWindow(QWidget):
         if not new_name or new_name == node.name:
             return
         node.name = new_name
-        item = self.tree.model().itemFromIndex(index)
-        if item is not None:
-            item.setText(new_name)
-        error = self._save_menu()
-        if error:
-            QMessageBox.critical(self, f"{APP_NAME} — cannot save menu", error)
+        self._save_and_reload()
 
-    def _save_menu(self) -> str | None:
+    def _handle_move(self, index: QModelIndex, delta: int) -> None:
+        """The row's move up/down icon was clicked; `delta` is -1 or +1."""
+        siblings = self._sibling_list(index)
+        pos = index.row()
+        new_pos = pos + delta
+        if not (0 <= new_pos < len(siblings)):
+            return  # the icon shouldn't have been shown at all; ignore it
+        siblings[pos], siblings[new_pos] = siblings[new_pos], siblings[pos]
+        self._save_and_reload()
+
+    def _sibling_list(self, index: QModelIndex) -> list[MenuNode]:
+        """The MenuNode list `index`'s node lives in.
+
+        `self.nodes` for a top-level item, or its parent section's
+        `children` otherwise — found by walking the same row-path down
+        `self.nodes` that the model index describes.
+        """
+        rows: list[int] = []
+        parent = index.parent()
+        while parent.isValid():
+            rows.insert(0, parent.row())
+            parent = parent.parent()
+        siblings = self.nodes
+        for row in rows:
+            siblings = siblings[row].children
+        return siblings
+
+    def _save_and_reload(self) -> None:
+        """Write `self.nodes`/`options` out, then reload from disk.
+
+        Rather than patch the tree view's model in place, this takes the
+        same one-way trip through `load_menu` that startup does — simpler
+        to get right, and it guarantees the GUI matches what's actually on
+        disk. The user's current folder and highlighted row are both
+        preserved across the rebuild.
+        """
+        path = self.tree.current_path()
+        select_name = self.tree.current_selection_name()
         try:
             dump_menu(self.menu_path, self.nodes, self.options)
         except OSError as exc:
-            return f"Could not write {self.menu_path}:\n\n{exc}"
-        return None
+            QMessageBox.critical(
+                self, f"{APP_NAME} — cannot save menu", f"Could not write {self.menu_path}:\n\n{exc}"
+            )
+            return
+
+        nodes, options, errors = load_menu(self.menu_path)
+        if errors:
+            QMessageBox.critical(
+                self, f"{APP_NAME} — cannot reload menu", format_errors(self.menu_path, errors)
+            )
+            return
+        self.nodes = nodes
+        self.options = options
+        self.tree.set_nodes(nodes, restore_path=path, select_name=select_name)
 
     def edit_menu(self) -> None:
         """Open the menu file itself in the configured editor.
