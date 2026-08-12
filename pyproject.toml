@@ -1,0 +1,14 @@
+[project]
+name = "pycommander"
+version = "0.1.0"
+description = "Keyboard-driven menu/launcher whose menu lives in a single YAML file"
+requires-python = ">=3.11"
+dependencies = [
+    "PyQt6>=6.6",
+    "PyYAML>=6.0",
+]
+
+# Not an installable package: uv only builds the virtualenv from the
+# dependencies above, and start.sh runs the code straight out of the tree.
+[tool.uv]
+package = false

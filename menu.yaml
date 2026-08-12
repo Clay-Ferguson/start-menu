@@ -1,0 +1,66 @@
+# PyCommander menu definition.
+#
+# An item with `items:` is a section (a submenu); an item with `file:` is a
+# launchable script. Order here is the order on screen.
+#
+#   launch: detached   no terminal window at all; output discarded (GUI apps)
+#           terminal   fresh window; closes the moment the script exits (default)
+#           hold       fresh window; held open until you press Enter
+#
+# Optional per-item keys: `icon:` (icon theme name or image path) and, on
+# scripts, `cwd:` (defaults to the script's own directory).
+
+menu:
+  - name: Encryption
+    items:
+      - name: decrypt
+        file: /home/clay/ferguson/scripts/encryption/decrypt_.sh
+        launch: terminal
+      - name: encrypt
+        file: /home/clay/ferguson/scripts/encryption/encrypt_.sh
+        launch: terminal
+
+  - name: LLM Server
+    items:
+      - name: start-server
+        file: /home/clay/ferguson/commander/scripts/LLM Server/start-server_.sh
+        launch: terminal
+      - name: status
+        file: /home/clay/ferguson/projects/llama-deck/status.sh
+        launch: hold
+      - name: stop-server
+        file: /home/clay/ferguson/projects/llama-deck/stop-server.sh
+        launch: hold
+
+  - name: Maintenance
+    items:
+      - name: backup
+        file: /home/clay/ferguson/scripts/backup/backup.sh
+        launch: terminal
+      - name: clean-images
+        file: /home/clay/ferguson/commander/scripts/Maintenance/clean-images_.sh
+        launch: terminal
+      - name: extern-to-extern
+        file: /home/clay/ferguson/scripts/backup/extern-to-extern.sh
+        launch: terminal
+
+  - name: Passwords
+    items:
+      - name: edit-pass
+        file: /home/clay/ferguson/commander/scripts/Passwords/edit-pass_.sh
+        launch: terminal
+      - name: pick-pass
+        file: /home/clay/ferguson/commander/scripts/Passwords/pick-pass_.sh
+        launch: terminal
+
+  - name: claude_code
+    file: /home/clay/ferguson/commander/scripts/claude_code_.sh
+    launch: terminal
+
+  - name: Edit Finances
+    file: /home/clay/ferguson/commander/scripts/Edit Finances.sh
+    launch: detached
+
+  - name: Lingo Web
+    file: /home/clay/ferguson/commander/scripts/Lingo Web.sh
+    launch: detached

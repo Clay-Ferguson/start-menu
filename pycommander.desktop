@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=PyCommander
+Comment=Launch scripts via an arrow-key menu
+Exec=/home/clay/ferguson/projects/PyCommander/start.sh
+Icon=/home/clay/ferguson/projects/PyCommander/pycommander.png
+Terminal=false
+Type=Application
+Categories=Utility;
