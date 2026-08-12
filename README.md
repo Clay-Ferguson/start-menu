@@ -33,7 +33,6 @@ launcher; `./uninstall.sh` removes it.
 | `→` | Open the highlighted section (no-op on a script) |
 | `←` | Back up one level, landing the highlight on the section you came out of |
 | `⏎` | Launch the highlighted script, or open the highlighted section |
-| `F5` / `Ctrl+R` | Reload `menu.yaml` from disk |
 | `Esc` / `q` | Quit |
 
 The window **stays open** after a launch, so you can fire off several things in
@@ -133,8 +132,8 @@ menu.yaml has 2 problem(s):
   • menu[4] (Lingo Web): has both 'items:' and 'file:' — an item is either a section (items) or a script (file), not both.
 ```
 
-On startup that's fatal. On `F5` the previous menu stays loaded, so you can fix
-the file and hit `F5` again.
+Any of them is fatal: fix the file and start PyCommander again. There is no
+reload — editing the menu means restarting, which takes about as long.
 
 Missing script files are *not* an error at load time — a path may live on a
 drive that isn't mounted yet. You get a dialog if you try to launch one.

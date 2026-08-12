@@ -50,7 +50,7 @@ def main() -> int:
         )
         return 1
 
-    window = MainWindow(menu_path, nodes)
+    window = MainWindow(nodes)
     window.show()
     window.activateWindow()
     window.raise_()

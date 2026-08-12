@@ -24,11 +24,11 @@ from PyQt6.QtWidgets import (
 
 from . import APP_NAME
 from .launcher import launch
-from .menu import MenuError, MenuNode, load_menu
+from .menu import MenuNode
 
 NODE_ROLE = Qt.ItemDataRole.UserRole
 
-HINTS = "↑↓ move    → open    ← back    ⏎ launch    F5 reload    q quit"
+HINTS = "↑↓ move    → open    ← back    ⏎ launch    q quit"
 
 # A launcher is read at a glance from across the desk, not studied, so the menu
 # runs a few points above the desktop default with room around each row.
@@ -82,13 +82,10 @@ class MenuTreeView(QTreeView):
     # -- model ---------------------------------------------------------------
 
     def set_nodes(self, nodes: list[MenuNode]) -> None:
-        """Replace the menu, returning the view to the top level."""
+        """Build the model from the menu tree and show the top level."""
         model = QStandardItemModel(self)
         self._populate(model.invisibleRootItem(), nodes)
-        previous = self.model()
         self.setModel(model)
-        if previous is not None:
-            previous.deleteLater()  # setModel doesn't own it; reloads would pile up
         self.setRootIndex(QModelIndex())
         self._select_first()
         self.level_changed.emit()
@@ -131,46 +128,6 @@ class MenuTreeView(QTreeView):
             names.insert(0, index.data(Qt.ItemDataRole.DisplayRole))
             index = index.parent()
         return names
-
-    def current_path(self) -> list[str]:
-        """Breadcrumb plus the highlighted item — enough to restore a reload."""
-        path = self.breadcrumb()
-        current = self.currentIndex()
-        if current.isValid():
-            path.append(current.data(Qt.ItemDataRole.DisplayRole))
-        return path
-
-    def restore_path(self, path: list[str]) -> None:
-        """Best-effort: descend as far along `path` as the new menu still allows.
-
-        `path` is a breadcrumb followed by the highlighted item's name, as
-        returned by current_path(). Anything the reloaded menu no longer has
-        just stops the walk early.
-        """
-        if not path:
-            return
-        model = self.model()
-        root = QModelIndex()
-        for name in path[:-1]:
-            child = self._find_child(root, name)
-            if not child.isValid() or not model.hasChildren(child):
-                break
-            root = child
-        self.setRootIndex(root)
-        target = self._find_child(root, path[-1])
-        if target.isValid():
-            self.setCurrentIndex(target)
-        else:
-            self._select_first()
-        self.level_changed.emit()
-
-    def _find_child(self, parent: QModelIndex, name: str) -> QModelIndex:
-        model = self.model()
-        for row in range(model.rowCount(parent)):
-            child = model.index(row, 0, parent)
-            if child.data(Qt.ItemDataRole.DisplayRole) == name:
-                return child
-        return QModelIndex()
 
     def _select_first(self) -> None:
         first = self.model().index(0, 0, self.rootIndex())
@@ -225,10 +182,8 @@ class MenuTreeView(QTreeView):
 
 
 class MainWindow(QWidget):
-    def __init__(self, menu_path: str, nodes: list[MenuNode]) -> None:
+    def __init__(self, nodes: list[MenuNode]) -> None:
         super().__init__()
-        self.menu_path = menu_path
-
         self.setWindowTitle(APP_NAME)
         self.resize(560, 640)
 
@@ -254,12 +209,8 @@ class MainWindow(QWidget):
 
         # Shortcuts rather than keyPressEvent: QAbstractItemView swallows plain
         # letter keys (its type-ahead search), so "q" would never reach us here.
-        for keys, slot in (
-            (("Esc", "Q"), self.close),
-            (("F5", "Ctrl+R"), self.reload),
-        ):
-            for key in keys:
-                QShortcut(QKeySequence(key), self, activated=slot)
+        for key in ("Esc", "Q"):
+            QShortcut(QKeySequence(key), self, activated=self.close)
 
         self.tree.set_nodes(nodes)
         self.tree.setFocus()
@@ -277,25 +228,6 @@ class MainWindow(QWidget):
 
     def _show_launch_error(self, message: str) -> None:
         QMessageBox.critical(self, f"{APP_NAME} — launch failed", message)
-
-    def reload(self) -> None:
-        """Re-read the menu file, keeping the old menu if the new one is broken."""
-        try:
-            nodes, errors = load_menu(self.menu_path)
-        except MenuError as exc:
-            QMessageBox.critical(self, f"{APP_NAME} — reload failed", str(exc))
-            return
-        if errors:
-            QMessageBox.critical(
-                self,
-                f"{APP_NAME} — reload failed",
-                format_errors(self.menu_path, errors) + "\n\nThe previous menu is still loaded.",
-            )
-            return
-        path = self.tree.current_path()
-        self.tree.set_nodes(nodes)
-        self.tree.restore_path(path)
-        self.tree.setFocus()
 
 
 def _tooltip(node: MenuNode) -> str:
