@@ -38,8 +38,9 @@ from PyQt6.QtWidgets import (
 
 from . import APP_NAME, UI_POINT_SIZE
 from .dialogs import FolderNameDialog, ItemEditDialog
-from .launcher import launch, open_in_editor
+from .launcher import launch
 from .menu import MenuNode, Options, dump_menu, load_menu
+from .utils import open_in_editor
 
 NODE_ROLE = Qt.ItemDataRole.UserRole
 
@@ -507,7 +508,15 @@ class MainWindow(QWidget):
             node.name = new_name
             self._save_and_reload()
             return
-        dialog = ItemEditDialog(node.name, node.file, node.sh, node.launch, self, title="Edit Item")
+        dialog = ItemEditDialog(
+            node.name,
+            node.file,
+            node.sh,
+            node.launch,
+            self,
+            title="Edit Item",
+            editor=self.options.resolved_editor(),
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         name, file, sh, launch = dialog.results()
@@ -572,7 +581,7 @@ class MainWindow(QWidget):
         Same placement rule as "New Folder": the new item is appended to
         whichever level is currently on screen.
         """
-        dialog = ItemEditDialog(parent=self, title="Create Item")
+        dialog = ItemEditDialog(parent=self, title="Create Item", editor=self.options.resolved_editor())
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         name, file, sh, launch = dialog.results()

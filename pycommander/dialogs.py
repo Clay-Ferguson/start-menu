@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFontDatabase, QFontMetrics, QPalette
 from PyQt6.QtWidgets import (
     QApplication,
@@ -24,6 +23,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QRadioButton,
@@ -35,6 +35,7 @@ from PyQt6.QtWidgets import (
 
 from . import UI_POINT_SIZE
 from .menu import DEFAULT_LAUNCH, LAUNCH_DETACHED, LAUNCH_HOLD, LAUNCH_MODES, LAUNCH_TERMINAL
+from .utils import open_in_editor
 
 # A plain QDialog's outer edge is easy to lose against the desktop behind it,
 # so the real content sits inside a bordered QFrame instead — a QDialog won't
@@ -169,11 +170,13 @@ class ItemEditDialog(QDialog):
         launch: str = DEFAULT_LAUNCH,
         parent: QWidget | None = None,
         title: str = "Edit Item",
+        editor: str = "",
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
         self.resize(680, 640)
+        self._editor = editor
 
         name_label = QLabel("Name:")
         name_label.setStyleSheet(LABEL_STYLE)
@@ -201,13 +204,24 @@ class ItemEditDialog(QDialog):
         pick_button = QPushButton("Pick File…")
         pick_button.setStyleSheet(BUTTON_STYLE)
         pick_button.clicked.connect(self._pick_file)
+        # Opens the path currently in _file_edit in the configured editor —
+        # the same open_in_editor() used for the "e" (edit menu.yaml) shortcut
+        # — so a script can be edited without leaving PyCommander.
+        self._edit_file_button = QPushButton("Edit")
+        self._edit_file_button.setStyleSheet(BUTTON_STYLE)
+        self._edit_file_button.clicked.connect(self._edit_file)
+
+        file_buttons_row = QHBoxLayout()
+        file_buttons_row.addWidget(pick_button)
+        file_buttons_row.addWidget(self._edit_file_button)
+        file_buttons_row.addStretch(1)
 
         file_page = QWidget()
         file_page_layout = QVBoxLayout(file_page)
         file_page_layout.setContentsMargins(0, 0, 0, 0)
         file_page_layout.setSpacing(10)
         file_page_layout.addWidget(self._file_edit)
-        file_page_layout.addWidget(pick_button, alignment=Qt.AlignmentFlag.AlignLeft)
+        file_page_layout.addLayout(file_buttons_row)
         file_page_layout.addStretch(1)
 
         # A fixed-width font, and a size big enough to show a real script
@@ -303,16 +317,24 @@ class ItemEditDialog(QDialog):
         if path:
             self._file_edit.setText(path)
 
+    def _edit_file(self) -> None:
+        path = self._file_edit.text().strip()
+        if not path:
+            return
+        resolved = os.path.expanduser(os.path.expandvars(path))
+        error = open_in_editor(resolved, self._editor)
+        if error:
+            QMessageBox.critical(self, "Cannot edit file", error)
+
     def _validate(self) -> None:
         # A blank name, or a blank file/sh for whichever type is selected,
         # would leave the item unusable, so Save stays disabled.
         name_ok = bool(self._name_edit.text().strip())
-        content_ok = (
-            bool(self._sh_edit.toPlainText().strip())
-            if self._sh_radio.isChecked()
-            else bool(self._file_edit.text().strip())
-        )
+        file_ok = bool(self._file_edit.text().strip())
+        content_ok = bool(self._sh_edit.toPlainText().strip()) if self._sh_radio.isChecked() else file_ok
         self._save_button.setEnabled(name_ok and content_ok)
+        # Edit only makes sense once there's a path to open.
+        self._edit_file_button.setEnabled(file_ok)
 
     def results(self) -> tuple[str, str | None, str | None, str]:
         """The dialog's fields as `(name, file, sh, launch)`, ready for a MenuNode."""
