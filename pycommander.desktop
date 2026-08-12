@@ -6,3 +6,4 @@ Icon=/home/clay/ferguson/projects/PyCommander/pycommander.png
 Terminal=false
 Type=Application
 Categories=Utility;
+StartupWMClass=pycommander

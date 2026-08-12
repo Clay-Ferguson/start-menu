@@ -30,6 +30,18 @@ NODE_ROLE = Qt.ItemDataRole.UserRole
 
 HINTS = "↑↓ move    → open    ← back    ⏎ launch    F5 reload    q quit"
 
+# A launcher is read at a glance from across the desk, not studied, so the menu
+# runs a few points above the desktop default with room around each row.
+MENU_POINT_SIZE = 15
+ICON_SIZE = 28
+ROW_PADDING = 10  # px above and below each row's text
+
+# The desktop's own highlight color (Ubuntu's #E95420) is loud for something
+# you stare at while hunting a menu, so the selection bar is pinned to a
+# darker, less saturated orange instead of following the system accent.
+HIGHLIGHT_BG = "#9e4b2e"
+HIGHLIGHT_FG = "#ffffff"
+
 
 class MenuTreeView(QTreeView):
     """One-level-at-a-time tree driven entirely by the arrow keys."""
@@ -44,8 +56,21 @@ class MenuTreeView(QTreeView):
         self.setItemsExpandable(False)
         self.setExpandsOnDoubleClick(False)
         self.setUniformRowHeights(True)
-        self.setIconSize(QSize(22, 22))
+        self.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
         self.setIndentation(0)
+        font = self.font()
+        font.setPointSize(MENU_POINT_SIZE)
+        self.setFont(font)
+        self.setStyleSheet(
+            f"QTreeView {{ padding: 6px 0; }}"
+            f"QTreeView::item {{ padding: {ROW_PADDING}px 10px; }}"
+            # Both :active and :!active, so the bar keeps its color instead of
+            # graying out whenever the window loses focus.
+            f"QTreeView::item:selected {{"
+            f" background: {HIGHLIGHT_BG}; color: {HIGHLIGHT_FG}; }}"
+            f"QTreeView::item:selected:!active {{"
+            f" background: {HIGHLIGHT_BG}; color: {HIGHLIGHT_FG}; }}"
+        )
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -207,14 +232,16 @@ class MainWindow(QWidget):
         self.resize(560, 640)
 
         self.header = QLabel()
-        self.header.setStyleSheet("font-weight: bold; padding: 6px 8px;")
+        self.header.setStyleSheet(
+            f"font-weight: bold; font-size: {MENU_POINT_SIZE + 1}pt; padding: 12px 14px;"
+        )
 
         self.tree = MenuTreeView(self)
         self.tree.level_changed.connect(self._update_header)
         self.tree.launch_failed.connect(self._show_launch_error)
 
         footer = QLabel(HINTS)
-        footer.setStyleSheet("padding: 6px 8px;")
+        footer.setStyleSheet(f"font-size: {MENU_POINT_SIZE - 3}pt; padding: 10px 14px;")
         footer.setEnabled(False)  # renders in the theme's disabled (dim) color
 
         layout = QVBoxLayout(self)
@@ -237,8 +264,15 @@ class MainWindow(QWidget):
         self.tree.setFocus()
 
     def _update_header(self) -> None:
+        """Show where we are, or nothing at all at the top level.
+
+        The app's name lives in the title bar; inside the window the header
+        earns its space only once we've descended into a section, so at the
+        top level it disappears entirely rather than leaving a blank strip.
+        """
         crumbs = self.tree.breadcrumb()
-        self.header.setText(" — ".join([APP_NAME, *crumbs]) if crumbs else APP_NAME)
+        self.header.setText(" / ".join(crumbs))
+        self.header.setVisible(bool(crumbs))
 
     def _show_launch_error(self, message: str) -> None:
         QMessageBox.critical(self, f"{APP_NAME} — launch failed", message)

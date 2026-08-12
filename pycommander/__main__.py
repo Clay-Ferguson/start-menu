@@ -32,6 +32,10 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setApplicationDisplayName(APP_NAME)
+    # Ties the window to pycommander.desktop, so the desktop shows our icon in
+    # the dock and alt-tab instead of a generic one. Without it the Wayland
+    # app_id is derived from argv[0] ("python3") and matches nothing.
+    app.setDesktopFileName("pycommander")
     if os.path.isfile(ICON):
         app.setWindowIcon(QIcon(ICON))
 
