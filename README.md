@@ -59,7 +59,7 @@ the order you write them — there is no sorting.
 
 ```yaml
 menu:
-  - name: Maintenance
+  - folder: Maintenance
     icon: applications-system        # optional
     items:
       - name: backup
@@ -83,7 +83,8 @@ menu:
 
 | Key | Applies to | Required | Meaning |
 |---|---|---|---|
-| `name` | all | yes | The label shown in the menu |
+| `name` | script | yes | The label shown in the menu |
+| `folder` | section | yes | The label shown in the menu |
 | `items` | section | yes | The child items |
 | `file` | script | one of | Path to a shell script. `~` and `$VARS` are expanded and symlinks resolved |
 | `sh` | script | `file`/`sh` | Shell commands written inline, one line or many |

@@ -21,7 +21,7 @@ LAUNCH_HOLD = "hold"  # new window, held open until the user presses Enter
 LAUNCH_MODES = (LAUNCH_DETACHED, LAUNCH_TERMINAL, LAUNCH_HOLD)
 DEFAULT_LAUNCH = LAUNCH_TERMINAL
 
-SECTION_KEYS = {"name", "icon", "items"}
+SECTION_KEYS = {"folder", "icon", "items"}
 SCRIPT_KEYS = {"name", "icon", "file", "sh", "launch", "cwd"}
 OPTION_KEYS = {"editor"}
 TOP_LEVEL_KEYS = {"menu", "options"}
@@ -160,21 +160,24 @@ def _parse_list(raw, where: str, errors: list[str]) -> list[MenuNode]:
 
 def _parse_node(raw, where: str, errors: list[str]) -> MenuNode | None:
     if not isinstance(raw, dict):
-        errors.append(f"{where}: expected a mapping with a 'name:', got {_kind(raw)}.")
+        errors.append(f"{where}: expected a mapping with a 'name:' or 'folder:', got {_kind(raw)}.")
         return None
 
-    name = raw.get("name")
-    if name is None:
-        errors.append(f"{where}: missing required 'name:'.")
-        name = "(unnamed)"
-    elif not isinstance(name, str):
-        errors.append(f"{where}: 'name:' must be text, got {_kind(name)}.")
-        name = str(name)
-
-    label = f"{where} ({name})"
     has_items = "items" in raw
     has_file = "file" in raw
     has_sh = "sh" in raw
+
+    # A section is named with `folder:`; a script (file or sh) with `name:`.
+    name_key = "folder" if has_items else "name"
+    name = raw.get(name_key)
+    if name is None:
+        errors.append(f"{where}: missing required '{name_key}:'.")
+        name = "(unnamed)"
+    elif not isinstance(name, str):
+        errors.append(f"{where}: '{name_key}:' must be text, got {_kind(name)}.")
+        name = str(name)
+
+    label = f"{where} ({name})"
 
     # Exactly one of the three decides what this item is.
     present = [k for k, ok in (("items", has_items), ("file", has_file), ("sh", has_sh)) if ok]

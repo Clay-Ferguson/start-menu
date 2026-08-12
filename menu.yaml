@@ -19,14 +19,14 @@ options:
   editor: code
 
 menu:
-  - name: Encryption
+  - folder: Encryption
     items:
       - name: decrypt
-        file: /home/clay/ferguson/scripts/encryption/decrypt_.sh
+        file: ~/ferguson/scripts/encryption/decrypt_.sh
       - name: encrypt
         file: /home/clay/ferguson/scripts/encryption/encrypt_.sh
 
-  - name: LLM Server
+  - folder: LLM Server
     items:
       - name: start-server
         file: /home/clay/ferguson/commander/scripts/LLM Server/start-server_.sh
@@ -37,7 +37,7 @@ menu:
         file: /home/clay/ferguson/projects/llama-deck/stop-server.sh
         launch: hold
 
-  - name: Maintenance
+  - folder: Maintenance
     items:
       - name: backup
         file: /home/clay/ferguson/scripts/backup/backup.sh
@@ -46,14 +46,14 @@ menu:
       - name: extern-to-extern
         file: /home/clay/ferguson/scripts/backup/extern-to-extern.sh
 
-  - name: Passwords
+  - folder: Passwords
     items:
       - name: edit-pass
         file: /home/clay/ferguson/commander/scripts/Passwords/edit-pass_.sh
       - name: pick-pass
         file: /home/clay/ferguson/commander/scripts/Passwords/pick-pass_.sh
 
-  - name: System
+  - folder: System
     items:
       # Inline commands, written straight into this file — no script needed.
       - name: Memory
