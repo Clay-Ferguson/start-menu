@@ -53,6 +53,21 @@ menu:
         file: /home/clay/ferguson/commander/scripts/Passwords/pick-pass_.sh
         launch: terminal
 
+  - name: System
+    items:
+      # Inline commands, written straight into this file — no script needed.
+      - name: Memory
+        sh: free -h
+        launch: hold
+      - name: Disk space
+        launch: hold
+        sh: |
+          echo "Filesystem usage:"
+          df -h -x tmpfs -x devtmpfs -x efivarfs
+          echo
+          echo "Largest items in $HOME:"
+          du -h --max-depth=1 "$HOME" 2>/dev/null | sort -rh | head -10
+
   - name: claude_code
     file: /home/clay/ferguson/commander/scripts/claude_code_.sh
     launch: terminal
