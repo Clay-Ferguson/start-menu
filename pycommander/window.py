@@ -37,7 +37,7 @@ from PyQt6.QtWidgets import (
 )
 
 from . import APP_NAME, UI_POINT_SIZE
-from .dialogs import FolderNameDialog
+from .dialogs import FolderNameDialog, ItemEditDialog
 from .launcher import launch, open_in_editor
 from .menu import MenuNode, Options, dump_menu, load_menu
 
@@ -435,7 +435,7 @@ class MainWindow(QWidget):
         new_folder_button.clicked.connect(self._handle_new_folder)
         new_item_button = QPushButton("New Item")
         new_item_button.setStyleSheet(f"font-size: {MENU_POINT_SIZE - 3}pt; padding: 4px 12px;")
-        # TODO: wire up once item (script) creation has a dialog of its own.
+        new_item_button.clicked.connect(self._handle_new_item)
         edit_toolbar_layout.addWidget(new_folder_button)
         edit_toolbar_layout.addWidget(new_item_button)
         edit_toolbar_layout.addStretch(1)
@@ -493,17 +493,30 @@ class MainWindow(QWidget):
         QMessageBox.critical(self, f"{APP_NAME} — launch failed", message)
 
     def _handle_edit_icon(self, index: QModelIndex) -> None:
-        """The row's edit icon was clicked. Only folders have an editor so far."""
+        """The row's edit icon was clicked: open the dialog for its kind."""
         node = self.tree.node_at(index)
-        if node is None or not node.is_section:
-            return  # scripts: no editor yet, ignore the click
-        dialog = FolderNameDialog(node.name, self)
+        if node is None:
+            return
+        if node.is_section:
+            dialog = FolderNameDialog(node.name, self)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+            new_name = dialog.new_name()
+            if not new_name or new_name == node.name:
+                return
+            node.name = new_name
+            self._save_and_reload()
+            return
+        dialog = ItemEditDialog(node.name, node.file, node.sh, node.launch, self, title="Edit Item")
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        new_name = dialog.new_name()
-        if not new_name or new_name == node.name:
+        name, file, sh, launch = dialog.results()
+        if not name:
             return
-        node.name = new_name
+        node.name = name
+        node.file = file
+        node.sh = sh
+        node.launch = launch
         self._save_and_reload()
 
     def _handle_delete_icon(self, index: QModelIndex) -> None:
@@ -551,6 +564,21 @@ class MainWindow(QWidget):
         if not name:
             return
         self._current_level_nodes().append(MenuNode(name=name))
+        self._save_and_reload(select_name=name)
+
+    def _handle_new_item(self) -> None:
+        """The toolbar's "New Item" button was clicked.
+
+        Same placement rule as "New Folder": the new item is appended to
+        whichever level is currently on screen.
+        """
+        dialog = ItemEditDialog(parent=self, title="Create Item")
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        name, file, sh, launch = dialog.results()
+        if not name:
+            return
+        self._current_level_nodes().append(MenuNode(name=name, file=file, sh=sh, launch=launch))
         self._save_and_reload(select_name=name)
 
     def _current_level_nodes(self) -> list[MenuNode]:
