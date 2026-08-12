@@ -1,0 +1,62 @@
+# PyCommander example menu.
+#
+# This is a starting point, not a real setup — it only uses applications and
+# commands that ship on a standard Ubuntu Desktop install, so it should run
+# as-is. Point PyCommander at a copy of this file, flip on "Edit" (or press
+# "e" to open it in a text editor) to see how each entry is built, and start
+# swapping these items for your own. See README.md for the full reference.
+
+options:
+  # What "e" opens this file with. xdg-open defers to whatever your desktop
+  # associates with .yaml files; point this at your editor instead, e.g.
+  # "code -n" or "gedit", if you'd rather it always open there.
+  editor: xdg-open
+
+menu:
+  - folder: Applications
+    icon: applications-other
+    items:
+      - name: Firefox
+        icon: firefox
+        file: /usr/bin/firefox
+        launch: detached        # GUI app: no terminal window wanted
+
+      - name: Files
+        icon: system-file-manager
+        file: /usr/bin/nautilus
+        launch: detached
+
+      - name: Terminal
+        icon: utilities-terminal
+        file: /usr/bin/gnome-terminal
+        launch: detached
+
+      - name: Calculator
+        icon: accessories-calculator
+        file: /usr/bin/gnome-calculator
+        launch: detached
+
+  - folder: Shell Script Examples
+    icon: utilities-terminal
+    items:
+      - name: System Info
+        launch: hold            # window stays open afterward so you can read it
+        sh: |
+          echo "Hostname:  $(hostname)"
+          echo "Kernel:    $(uname -sr)"
+          echo "Uptime:    $(uptime -p)"
+          echo
+          echo "Memory:"
+          free -h
+          echo
+          echo "Disk usage:"
+          df -h /
+
+      - name: Network Check
+        launch: hold
+        sh: |
+          echo "Local IP address(es):"
+          hostname -I
+          echo
+          echo "Pinging 8.8.8.8..."
+          ping -c 4 8.8.8.8

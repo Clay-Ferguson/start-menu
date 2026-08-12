@@ -31,6 +31,25 @@ launcher. It prompts for the program's install directory and the menu file to
 use, and bakes both into the desktop entry's launch command; `./uninstall.sh`
 removes the entry.
 
+## Example menu
+
+`menu.yaml`, checked into the repo, is a ready-to-run example rather than
+anyone's real menu — every entry only uses applications and commands that
+ship on a standard Ubuntu Desktop install, so it runs as-is:
+
+```bash
+./start.sh menu.yaml
+```
+
+It's meant to be read as much as run: an "Applications" section of `file:`
+items (`launch: detached`) launching Firefox, Files, Terminal and Calculator,
+and a "Shell Script Examples" section of `sh:` snippets (`launch: hold`) that
+print system and network info, plus an `options.editor` setting. Turn on
+**Edit** (or press `e` to open the file itself) to see how each piece maps to
+the reference below, then start replacing the entries with your own —
+`menu.yaml` isn't read from any fixed location, so point `start.sh` at a copy
+of it anywhere you like.
+
 ## Keys
 
 | Key | Action |
@@ -161,7 +180,7 @@ drive that isn't mounted yet. You get a dialog if you try to launch one.
 
 ```
 start.sh              launcher (uv run python -m pycommander)
-menu.yaml             the menu
+menu.yaml             example menu (see "Example menu" above); point start.sh at your own file instead
 pycommander/
   __main__.py         argparse, QApplication, startup validation
   menu.py             YAML -> MenuNode tree, with validation
