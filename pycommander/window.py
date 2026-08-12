@@ -12,6 +12,7 @@ import os
 
 from PyQt6.QtCore import QModelIndex, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import (
+    QColor,
     QIcon,
     QKeySequence,
     QPainter,
@@ -21,8 +22,10 @@ from PyQt6.QtGui import (
     QStandardItemModel,
 )
 from PyQt6.QtWidgets import (
+    QAbstractButton,
     QAbstractItemView,
     QDialog,
+    QHBoxLayout,
     QLabel,
     QMessageBox,
     QStyle,
@@ -39,7 +42,7 @@ from .menu import MenuNode, Options, dump_menu
 
 NODE_ROLE = Qt.ItemDataRole.UserRole
 
-HINTS = "↑↓ move    → open    ← back    ⏎ launch    e edit menu    q quit"
+HINTS = "⏎ launch    e edit menu    q quit"
 
 MENU_POINT_SIZE = UI_POINT_SIZE  # local alias: this file spells it out a lot
 ICON_SIZE = 28
@@ -81,7 +84,11 @@ def _edit_icon() -> QIcon:
 
 
 class RowActionDelegate(QStyledItemDelegate):
-    """Draws the right-justified action icon(s) on top of each normal row."""
+    """Draws the right-justified action icon(s) on top of each normal row.
+
+    Only while the view's edit mode is on — otherwise the row paints exactly
+    as it did before this feature existed.
+    """
 
     def __init__(self, parent: QTreeView) -> None:
         super().__init__(parent)
@@ -89,7 +96,8 @@ class RowActionDelegate(QStyledItemDelegate):
 
     def paint(self, painter, option, index) -> None:
         super().paint(painter, option, index)
-        self._edit_icon.paint(painter, self.icon_rect(option.rect, EDIT_SLOT))
+        if getattr(self.parent(), "edit_mode", False):
+            self._edit_icon.paint(painter, self.icon_rect(option.rect, EDIT_SLOT))
 
     @staticmethod
     def icon_rect(row_rect: QRect, slot: int) -> QRect:
@@ -97,6 +105,36 @@ class RowActionDelegate(QStyledItemDelegate):
         right = row_rect.right() - ACTION_ICON_MARGIN - slot * (ACTION_ICON_SIZE + ACTION_ICON_MARGIN)
         top = row_rect.top() + (row_rect.height() - ACTION_ICON_SIZE) // 2
         return QRect(right - ACTION_ICON_SIZE, top, ACTION_ICON_SIZE, ACTION_ICON_SIZE)
+
+
+class ToggleSwitch(QAbstractButton):
+    """A small on/off switch, styled like a mobile settings toggle.
+
+    QCheckBox's indicator is themed by the desktop's QStyle and awkward to
+    reshape into a switch; a bare checkable QAbstractButton with its own
+    paintEvent gives full control over the track/knob look instead.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedSize(40, 22)
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+
+        track_color = QColor(HIGHLIGHT_BG if self.isChecked() else "#888888")
+        painter.setBrush(track_color)
+        radius = self.height() / 2
+        painter.drawRoundedRect(self.rect(), radius, radius)
+
+        knob_diameter = self.height() - 4
+        knob_x = self.width() - knob_diameter - 2 if self.isChecked() else 2
+        painter.setBrush(QColor("#ffffff"))
+        painter.drawEllipse(int(knob_x), 2, knob_diameter, knob_diameter)
 
 
 class MenuTreeView(QTreeView):
@@ -108,6 +146,7 @@ class MenuTreeView(QTreeView):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.edit_mode = False  # off by default; never persisted across runs
         self.setHeaderHidden(True)
         self.setRootIsDecorated(False)  # no expand arrows: levels never expand
         self.setItemsExpandable(False)
@@ -118,11 +157,23 @@ class MenuTreeView(QTreeView):
         font = self.font()
         font.setPointSize(MENU_POINT_SIZE)
         self.setFont(font)
-        self.setStyleSheet(
+        self.setStyleSheet(self._stylesheet())
+        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setItemDelegate(RowActionDelegate(self))
+        self.doubleClicked.connect(self._activate)
+
+    def _stylesheet(self) -> str:
+        # Right padding only reserves room for the action icon(s) while edit
+        # mode is on; off, rows use the full width, same as before this
+        # feature existed.
+        right_padding = ACTION_AREA_WIDTH if self.edit_mode else 10
+        return (
             f"QTreeView {{ padding: 6px 0; }}"
-            # Extra right padding reserves room for the action icon(s) so
-            # a long name elides before it instead of running under them.
-            f"QTreeView::item {{ padding: {ROW_PADDING}px {ACTION_AREA_WIDTH}px"
+            f"QTreeView::item {{ padding: {ROW_PADDING}px {right_padding}px"
             f" {ROW_PADDING}px 10px; }}"
             # Both :active and :!active, so the bar keeps its color instead of
             # graying out whenever the window loses focus.
@@ -131,13 +182,11 @@ class MenuTreeView(QTreeView):
             f"QTreeView::item:selected:!active {{"
             f" background: {HIGHLIGHT_BG}; color: {HIGHLIGHT_FG}; }}"
         )
-        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.setItemDelegate(RowActionDelegate(self))
-        self.doubleClicked.connect(self._activate)
+
+    def set_edit_mode(self, enabled: bool) -> None:
+        self.edit_mode = enabled
+        self.setStyleSheet(self._stylesheet())
+        self.viewport().update()
 
     # -- model ---------------------------------------------------------------
 
@@ -223,7 +272,7 @@ class MenuTreeView(QTreeView):
     # -- mouse -----------------------------------------------------------
 
     def mousePressEvent(self, event) -> None:
-        if event.button() == Qt.MouseButton.LeftButton:
+        if self.edit_mode and event.button() == Qt.MouseButton.LeftButton:
             pos = event.position().toPoint()
             index = self.indexAt(pos)
             if index.isValid():
@@ -274,9 +323,24 @@ class MainWindow(QWidget):
         self.tree.launch_failed.connect(self._show_launch_error)
         self.tree.edit_requested.connect(self._handle_edit_icon)
 
-        footer = QLabel(HINTS)
-        footer.setStyleSheet(f"font-size: {MENU_POINT_SIZE - 3}pt; padding: 10px 14px;")
-        footer.setEnabled(False)  # renders in the theme's disabled (dim) color
+        self.edit_toggle = ToggleSwitch(self)
+        self.edit_toggle.toggled.connect(self.tree.set_edit_mode)
+
+        edit_label = QLabel("Edit")
+        edit_label.setStyleSheet(f"font-size: {MENU_POINT_SIZE - 3}pt;")
+
+        hints = QLabel(HINTS)
+        hints.setStyleSheet(f"font-size: {MENU_POINT_SIZE - 3}pt;")
+        hints.setEnabled(False)  # renders in the theme's disabled (dim) color
+
+        footer = QWidget()
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(14, 10, 14, 10)
+        footer_layout.setSpacing(8)
+        footer_layout.addWidget(self.edit_toggle)
+        footer_layout.addWidget(edit_label)
+        footer_layout.addStretch(1)
+        footer_layout.addWidget(hints)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
