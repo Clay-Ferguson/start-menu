@@ -12,8 +12,9 @@ from __future__ import annotations
 import os
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFontDatabase, QFontMetrics
+from PyQt6.QtGui import QColor, QFontDatabase, QFontMetrics, QPalette
 from PyQt6.QtWidgets import (
+    QApplication,
     QButtonGroup,
     QComboBox,
     QDialog,
@@ -26,6 +27,7 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QRadioButton,
+    QSizePolicy,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -38,7 +40,6 @@ from .menu import DEFAULT_LAUNCH, LAUNCH_DETACHED, LAUNCH_HOLD, LAUNCH_MODES, LA
 # so the real content sits inside a bordered QFrame instead — a QDialog won't
 # reliably paint a stylesheet border of its own, but a QFrame always will.
 BORDER_STYLE = "#dialogFrame { border: 1px solid #a0a0a0; border-radius: 6px; }"
-FIELD_STYLE = f"padding: 8px; font-size: {UI_POINT_SIZE}pt;"
 LABEL_STYLE = f"font-size: {UI_POINT_SIZE}pt;"
 BUTTON_STYLE = f"QPushButton {{ font-size: {UI_POINT_SIZE}pt; padding: 8px 20px; }}"
 
@@ -56,6 +57,39 @@ SH_EDITOR_COLUMNS = 80
 SH_EDITOR_ROWS = 10
 
 
+def _field_background() -> str:
+    """A background a shade lighter than the theme's default input color.
+
+    Computed from the live application palette (rather than a fixed hex)
+    so it lightens relative to whatever the desktop theme's own input
+    background is, instead of assuming a light or a dark theme. Queried
+    lazily — at dialog-build time, not import time — since no theme is
+    attached to the palette until QApplication exists.
+    """
+    base = QApplication.palette().color(QPalette.ColorRole.Base)
+    return base.lighter(130).name()
+
+
+def _field_border() -> str:
+    """A light-gray border, guaranteed lighter than the field's own
+    background so it actually reads as an outline instead of vanishing into
+    it. Setting any QSS on a widget (as `_field_background` does) opts it
+    out of the style's native border too, so this is drawn explicitly
+    rather than relying on a native on/off switch.
+    """
+    return QColor(_field_background()).lighter(140).name()
+
+
+def _field_style() -> str:
+    """Shared padding/font styling for single-line inputs and the combobox,
+    plus the lightened background and border from `_field_background` and
+    `_field_border`."""
+    return (
+        f"padding: 8px; font-size: {UI_POINT_SIZE}pt;"
+        f" background-color: {_field_background()}; border: 1px solid {_field_border()};"
+    )
+
+
 class FolderNameDialog(QDialog):
     """A single text field for naming a section ('folder:') entry.
 
@@ -70,7 +104,7 @@ class FolderNameDialog(QDialog):
         self.resize(440, 220)
 
         self._name_edit = QLineEdit(current_name)
-        self._name_edit.setStyleSheet(FIELD_STYLE)
+        self._name_edit.setStyleSheet(_field_style())
         self._name_edit.selectAll()
 
         label = QLabel("Folder name:")
@@ -138,7 +172,7 @@ class ItemEditDialog(QDialog):
         name_label = QLabel("Name:")
         name_label.setStyleSheet(LABEL_STYLE)
         self._name_edit = QLineEdit(name)
-        self._name_edit.setStyleSheet(FIELD_STYLE)
+        self._name_edit.setStyleSheet(_field_style())
 
         is_sh = sh is not None
         self._file_radio = QRadioButton("File")
@@ -157,7 +191,7 @@ class ItemEditDialog(QDialog):
         type_row.addStretch(1)
 
         self._file_edit = QLineEdit(file or "")
-        self._file_edit.setStyleSheet(FIELD_STYLE)
+        self._file_edit.setStyleSheet(_field_style())
         pick_button = QPushButton("Pick File…")
         pick_button.setStyleSheet(BUTTON_STYLE)
         pick_button.clicked.connect(self._pick_file)
@@ -176,6 +210,9 @@ class ItemEditDialog(QDialog):
         mono_font.setPointSize(UI_POINT_SIZE)
         self._sh_edit = QPlainTextEdit(sh or "")
         self._sh_edit.setFont(mono_font)
+        self._sh_edit.setStyleSheet(
+            f"background-color: {_field_background()}; border: 1px solid {_field_border()};"
+        )
         self._sh_edit.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         metrics = QFontMetrics(mono_font)
         self._sh_edit.setMinimumSize(
@@ -200,11 +237,17 @@ class ItemEditDialog(QDialog):
         launch_label = QLabel("Launch:")
         launch_label.setStyleSheet(LABEL_STYLE)
         self._launch_combo = QComboBox()
-        self._launch_combo.setStyleSheet(FIELD_STYLE)
+        self._launch_combo.setStyleSheet(_field_style())
         for mode in LAUNCH_MODES:
             self._launch_combo.addItem(LAUNCH_LABELS[mode], mode)
         launch_index = self._launch_combo.findData(launch)
         self._launch_combo.setCurrentIndex(launch_index if launch_index >= 0 else 0)
+        # Size to the longest label instead of stretching across the dialog.
+        self._launch_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self._launch_combo.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+        launch_row = QHBoxLayout()
+        launch_row.addWidget(self._launch_combo)
+        launch_row.addStretch(1)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
@@ -226,7 +269,7 @@ class ItemEditDialog(QDialog):
         frame_layout.addLayout(type_row)
         frame_layout.addWidget(self._stack, 1)
         frame_layout.addWidget(launch_label)
-        frame_layout.addWidget(self._launch_combo)
+        frame_layout.addLayout(launch_row)
         frame_layout.addWidget(buttons)
 
         outer_layout = QVBoxLayout(self)
