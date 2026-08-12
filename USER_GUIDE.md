@@ -88,9 +88,9 @@ created or edited:
 
 | Mode | What you see | Typical use |
 |---|---|---|
-| **Detached (no window)** | Nothing — it runs silently in the background | GUI applications: browsers, editors, file managers |
-| **Terminal (closes when it exits)** | A new terminal window that closes the instant the command finishes | Interactive commands, or anything that prompts you |
-| **Hold (stays open until you press Enter)** | A new terminal window that stays open after the command finishes, showing its exit status, until you press Enter | Commands that print a report and then exit quickly, so you have time to read the output |
+| **Detached (no terminal)** | Nothing — it runs silently in the background | GUI applications: browsers, editors, file managers |
+| **Terminal (terminal auto-closes)** | A new terminal window that closes the instant the command finishes | Interactive commands, or anything that prompts you |
+| **Hold (terminal stays open)** | A new terminal window that stays open after the command finishes, showing its exit status, until you press Enter | Commands that print a report and then exit quickly, so you have time to read the output |
 
 ### Quitting
 

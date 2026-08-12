@@ -47,8 +47,8 @@ BUTTON_STYLE = f"QPushButton {{ font-size: {UI_POINT_SIZE}pt; padding: 8px 20px;
 # as each item's data) are the same strings menu.py reads and writes.
 LAUNCH_LABELS = {
     LAUNCH_DETACHED: "Detached (no window)",
-    LAUNCH_TERMINAL: "Terminal (closes when it exits)",
-    LAUNCH_HOLD: "Hold (stays open until you press Enter)",
+    LAUNCH_TERMINAL: "Terminal (terminal auto-closes)",
+    LAUNCH_HOLD: "Hold (terminal stays open)",
 }
 
 # The sh editor is sized to comfortably show a script this big without
