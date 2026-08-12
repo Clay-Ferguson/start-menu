@@ -52,13 +52,14 @@ TOOLTIP_LINES = 12  # of an inline sh snippet, before the tooltip is truncated
 
 # Right-justified per-row action icons. Slots are numbered from the row's
 # right edge, 0 = rightmost, so new icons can join without moving the old
-# ones. Left to right on screen: move up, move down, edit.
+# ones. Left to right on screen: move up, move down, edit, delete.
 ACTION_ICON_SIZE = 20
 ACTION_ICON_MARGIN = 8  # px around and between icons
-EDIT_SLOT = 0
-DOWN_SLOT = 1
-UP_SLOT = 2
-ACTION_SLOT_COUNT = 3
+DELETE_SLOT = 0
+EDIT_SLOT = 1
+DOWN_SLOT = 2
+UP_SLOT = 3
+ACTION_SLOT_COUNT = 4
 ACTION_AREA_WIDTH = ACTION_ICON_MARGIN + ACTION_SLOT_COUNT * (ACTION_ICON_SIZE + ACTION_ICON_MARGIN)
 
 # The desktop's own highlight color (Ubuntu's #E95420) is loud for something
@@ -100,6 +101,7 @@ class RowActionDelegate(QStyledItemDelegate):
         super().__init__(parent)
         self._icons = {
             "edit": _edit_icon(),
+            "delete": parent.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon),
             "up": parent.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp),
             "down": parent.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown),
         }
@@ -156,11 +158,17 @@ class MenuTreeView(QTreeView):
     level_changed = pyqtSignal()
     launch_failed = pyqtSignal(str)
     edit_requested = pyqtSignal(QModelIndex)
+    delete_requested = pyqtSignal(QModelIndex)
     move_up_requested = pyqtSignal(QModelIndex)
     move_down_requested = pyqtSignal(QModelIndex)
 
     # Which signal to emit for each action kind `visible_action_slots` hands out.
-    _ACTION_SIGNALS = {"edit": "edit_requested", "up": "move_up_requested", "down": "move_down_requested"}
+    _ACTION_SIGNALS = {
+        "edit": "edit_requested",
+        "delete": "delete_requested",
+        "up": "move_up_requested",
+        "down": "move_down_requested",
+    }
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -279,7 +287,7 @@ class MenuTreeView(QTreeView):
         The first item in a level has no "up" and the last has no "down" —
         there's nowhere for either to go.
         """
-        slots: dict[int, str] = {EDIT_SLOT: "edit"}
+        slots: dict[int, str] = {EDIT_SLOT: "edit", DELETE_SLOT: "delete"}
         row = index.row()
         count = self.model().rowCount(index.parent())
         if row > 0:
@@ -414,6 +422,7 @@ class MainWindow(QWidget):
         self.tree.level_changed.connect(self._update_header)
         self.tree.launch_failed.connect(self._show_launch_error)
         self.tree.edit_requested.connect(self._handle_edit_icon)
+        self.tree.delete_requested.connect(self._handle_delete_icon)
         self.tree.move_up_requested.connect(lambda index: self._handle_move(index, -1))
         self.tree.move_down_requested.connect(lambda index: self._handle_move(index, 1))
 
@@ -495,6 +504,36 @@ class MainWindow(QWidget):
         if not new_name or new_name == node.name:
             return
         node.name = new_name
+        self._save_and_reload()
+
+    def _handle_delete_icon(self, index: QModelIndex) -> None:
+        """The row's delete icon was clicked; confirm, then remove the item."""
+        node = self.tree.node_at(index)
+        if node is None:
+            return
+        siblings = self._sibling_list(index)
+        if siblings is self.nodes and len(siblings) == 1:
+            # menu.py requires the top-level menu to keep at least one item;
+            # a section, unlike the top level, is allowed to end up empty.
+            QMessageBox.warning(
+                self, f"{APP_NAME} — cannot delete", "The menu can't be left with no items at all."
+            )
+            return
+        detail = (
+            f" This deletes {len(node.children)} item(s) inside it too."
+            if node.is_section and node.children
+            else ""
+        )
+        reply = QMessageBox.question(
+            self,
+            "Delete",
+            f'Delete "{node.name}"?{detail}',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        del siblings[index.row()]
         self._save_and_reload()
 
     def _handle_new_folder(self) -> None:
