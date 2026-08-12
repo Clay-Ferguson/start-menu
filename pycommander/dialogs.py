@@ -56,6 +56,12 @@ LAUNCH_LABELS = {
 SH_EDITOR_COLUMNS = 80
 SH_EDITOR_ROWS = 10
 
+# AdjustToContents sizes the closed combo box to its current item's text, but
+# the dropdown popup's own item padding isn't accounted for by that, so the
+# longest label ends up elided with "…" once the popup opens. This is added
+# on top of the longest label's measured width to give the popup room too.
+LAUNCH_COMBO_EXTRA_WIDTH = 150
+
 
 def _field_background() -> str:
     """A background a shade lighter than the theme's default input color.
@@ -245,6 +251,13 @@ class ItemEditDialog(QDialog):
         # Size to the longest label instead of stretching across the dialog.
         self._launch_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self._launch_combo.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+        # AdjustToContents alone leaves the dropdown popup too narrow for its
+        # own longest entry (see LAUNCH_COMBO_EXTRA_WIDTH); floor the width.
+        metrics = QFontMetrics(self._launch_combo.font())
+        longest_label = max(LAUNCH_LABELS.values(), key=len)
+        self._launch_combo.setMinimumWidth(
+            metrics.horizontalAdvance(longest_label) + LAUNCH_COMBO_EXTRA_WIDTH
+        )
         launch_row = QHBoxLayout()
         launch_row.addWidget(self._launch_combo)
         launch_row.addStretch(1)
