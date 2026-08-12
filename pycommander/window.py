@@ -23,12 +23,12 @@ from PyQt6.QtWidgets import (
 )
 
 from . import APP_NAME
-from .launcher import launch
-from .menu import MenuNode
+from .launcher import launch, open_in_editor
+from .menu import MenuNode, Options
 
 NODE_ROLE = Qt.ItemDataRole.UserRole
 
-HINTS = "↑↓ move    → open    ← back    ⏎ launch    q quit"
+HINTS = "↑↓ move    → open    ← back    ⏎ launch    e edit menu    q quit"
 
 # A launcher is read at a glance from across the desk, not studied, so the menu
 # runs a few points above the desktop default with room around each row.
@@ -182,8 +182,11 @@ class MenuTreeView(QTreeView):
 
 
 class MainWindow(QWidget):
-    def __init__(self, nodes: list[MenuNode]) -> None:
+    def __init__(self, menu_path: str, nodes: list[MenuNode], options: Options) -> None:
         super().__init__()
+        self.menu_path = menu_path
+        self.options = options
+
         self.setWindowTitle(APP_NAME)
         self.resize(560, 640)
 
@@ -209,8 +212,9 @@ class MainWindow(QWidget):
 
         # Shortcuts rather than keyPressEvent: QAbstractItemView swallows plain
         # letter keys (its type-ahead search), so "q" would never reach us here.
-        for key in ("Esc", "Q"):
-            QShortcut(QKeySequence(key), self, activated=self.close)
+        for keys, slot in ((("Esc", "Q"), self.close), (("E",), self.edit_menu)):
+            for key in keys:
+                QShortcut(QKeySequence(key), self, activated=slot)
 
         self.tree.set_nodes(nodes)
         self.tree.setFocus()
@@ -228,6 +232,16 @@ class MainWindow(QWidget):
 
     def _show_launch_error(self, message: str) -> None:
         QMessageBox.critical(self, f"{APP_NAME} — launch failed", message)
+
+    def edit_menu(self) -> None:
+        """Open the menu file itself in the configured editor.
+
+        The window stays open, but nothing re-reads the file — edits take
+        effect the next time PyCommander starts.
+        """
+        error = open_in_editor(self.menu_path, self.options.resolved_editor())
+        if error:
+            QMessageBox.critical(self, f"{APP_NAME} — cannot edit menu", error)
 
 
 def _tooltip(node: MenuNode) -> str:

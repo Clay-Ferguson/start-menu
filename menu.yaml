@@ -13,6 +13,11 @@
 # launchable items, `cwd:` (defaults to the script's own directory for `file:`,
 # to $HOME for `sh:`).
 
+# Pressing 'e' opens this file in `editor`. It is a shell command, so it can
+# carry arguments (`code -n`). A GUI editor is assumed.
+options:
+  editor: code
+
 menu:
   - name: Encryption
     items:

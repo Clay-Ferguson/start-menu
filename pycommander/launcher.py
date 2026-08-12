@@ -56,6 +56,30 @@ def launch(node: MenuNode) -> str | None:
     return None
 
 
+def open_in_editor(path: str, editor: str) -> str | None:
+    """Open `path` in `editor`. Returns an error message, or None on success.
+
+    Routed through launch() as a detached inline snippet, so the editor is
+    spawned exactly the way a `launch: detached` menu item would be — its own
+    session, surviving PyCommander. `editor` is shell text, so it may carry
+    arguments of its own.
+    """
+    binary = shlex.split(editor)[0] if editor.strip() else ""
+    if not binary or not shutil.which(binary):
+        return (
+            f"Cannot open the menu file:\n\n"
+            f"The editor '{binary or editor}' was not found on PATH.\n\n"
+            f"Set 'editor:' under 'options:' in the menu file to one you have."
+        )
+    node = MenuNode(
+        name=os.path.basename(path),
+        sh=f"{editor} {shlex.quote(path)}",
+        launch=LAUNCH_DETACHED,
+        cwd=os.path.dirname(path),
+    )
+    return launch(node)
+
+
 def build_command(node: MenuNode) -> str:
     """The `bash -c` program that runs `node` under its launch mode.
 

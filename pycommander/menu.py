@@ -23,6 +23,24 @@ DEFAULT_LAUNCH = LAUNCH_TERMINAL
 
 SECTION_KEYS = {"name", "icon", "items"}
 SCRIPT_KEYS = {"name", "icon", "file", "sh", "launch", "cwd"}
+OPTION_KEYS = {"editor"}
+TOP_LEVEL_KEYS = {"menu", "options"}
+
+
+@dataclass
+class Options:
+    """Top-level settings, from the file's `options:` block."""
+
+    editor: str | None = None
+
+    def resolved_editor(self) -> str:
+        """The command that opens the menu file.
+
+        A shell command, so it may carry arguments (`code -n`). Unset falls
+        back to the usual environment variables, then to whatever the desktop
+        associates with the file.
+        """
+        return self.editor or os.environ.get("VISUAL") or os.environ.get("EDITOR") or "xdg-open"
 
 
 @dataclass
@@ -76,8 +94,8 @@ class MenuError(Exception):
     """A menu file that could not be read or parsed at all."""
 
 
-def load_menu(path: str) -> tuple[list[MenuNode], list[str]]:
-    """Read `path` and return (top-level nodes, validation errors).
+def load_menu(path: str) -> tuple[list[MenuNode], Options, list[str]]:
+    """Read `path` and return (top-level nodes, options, validation errors).
 
     Errors are human-readable strings carrying the offending node's location,
     e.g. "menu[2].items[0]: unknown launch mode 'bogus'". A non-empty error
@@ -94,16 +112,36 @@ def load_menu(path: str) -> tuple[list[MenuNode], list[str]]:
         raise MenuError(f"{path} is not valid YAML:\n\n{exc}") from None
 
     errors: list[str] = []
+    options = Options()
 
     if data is None:
-        return [], ["The menu file is empty; it needs a top-level 'menu:' list."]
+        return [], options, ["The menu file is empty; it needs a top-level 'menu:' list."]
     if not isinstance(data, dict):
-        return [], ["The menu file must be a mapping with a top-level 'menu:' key."]
+        return [], options, ["The menu file must be a mapping with a top-level 'menu:' key."]
     if "menu" not in data:
-        return [], ["Missing top-level 'menu:' key."]
+        return [], options, ["Missing top-level 'menu:' key."]
+    for key in sorted(set(data) - TOP_LEVEL_KEYS):
+        errors.append(f"'{key}:' is not a top-level key; expected {_join(TOP_LEVEL_KEYS)}.")
 
+    if "options" in data:
+        options = _parse_options(data["options"], errors)
     nodes = _parse_list(data["menu"], "menu", errors)
-    return nodes, errors
+    return nodes, options, errors
+
+
+def _parse_options(raw, errors: list[str]) -> Options:
+    if not isinstance(raw, dict):
+        errors.append(f"options: expected a mapping of settings, got {_kind(raw)}.")
+        return Options()
+
+    for key in sorted(set(raw) - OPTION_KEYS):
+        errors.append(f"options: '{key}:' is not a setting; expected {_join(OPTION_KEYS)}.")
+
+    editor = raw.get("editor")
+    if editor is not None and (not isinstance(editor, str) or not editor.strip()):
+        errors.append(f"options: 'editor:' must be a non-empty command, got {_kind(editor)}.")
+        editor = None
+    return Options(editor=editor)
 
 
 def _parse_list(raw, where: str, errors: list[str]) -> list[MenuNode]:

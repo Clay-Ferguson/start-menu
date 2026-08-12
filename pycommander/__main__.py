@@ -40,7 +40,7 @@ def main() -> int:
         app.setWindowIcon(QIcon(ICON))
 
     try:
-        nodes, errors = load_menu(menu_path)
+        nodes, options, errors = load_menu(menu_path)
     except MenuError as exc:
         QMessageBox.critical(None, f"{APP_NAME} — cannot start", str(exc))
         return 1
@@ -50,7 +50,7 @@ def main() -> int:
         )
         return 1
 
-    window = MainWindow(nodes)
+    window = MainWindow(menu_path, nodes, options)
     window.show()
     window.activateWindow()
     window.raise_()

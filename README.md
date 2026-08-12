@@ -33,6 +33,7 @@ launcher; `./uninstall.sh` removes it.
 | `→` | Open the highlighted section (no-op on a script) |
 | `←` | Back up one level, landing the highlight on the section you came out of |
 | `⏎` | Launch the highlighted script, or open the highlighted section |
+| `e` | Open `menu.yaml` itself in your editor |
 | `Esc` / `q` | Quit |
 
 The window **stays open** after a launch, so you can fire off several things in
@@ -40,7 +41,18 @@ a row. Launched scripts run in their own session and survive quitting.
 
 ## The menu file
 
-Top-level key `menu:` holds a list of items. Every item is exactly one of three
+Two top-level keys: `options:` for settings, `menu:` for the menu itself.
+
+```yaml
+options:
+  editor: code
+```
+
+| Setting | Meaning |
+|---|---|
+| `editor` | What `e` opens the menu file with. A shell command, so it can carry arguments (`code -n`). Defaults to `$VISUAL`, then `$EDITOR`, then `xdg-open`. A GUI editor is assumed — it is launched detached, with no terminal window, so a terminal editor like `vim` would have nowhere to draw |
+
+`menu:` holds a list of items. Every item is exactly one of three
 things, decided by which key it carries: `items:` makes it a **section**,
 `file:` a **script on disk**, and `sh:` an **inline snippet**. Items appear in
 the order you write them — there is no sorting.
