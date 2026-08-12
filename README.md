@@ -14,16 +14,22 @@ and the icons are all explicit YAML properties.
 ## Running
 
 ```bash
-./start.sh                    # uses ./menu.yaml
-./start.sh --menu other.yaml  # or any other menu file
+./start.sh /path/to/menu.yaml
 ```
+
+The menu file's path is a required argument — PyCommander always reads (and
+writes, when you edit through the GUI) exactly the file you point it at. If
+that file doesn't exist yet, it's created automatically with a small starter
+example, so pointing at a new path just works.
 
 `start.sh` runs the app through [uv](https://docs.astral.sh/uv/), which creates
 and refreshes the virtualenv from `pyproject.toml` on every run — there is no
 install step and nothing to activate.
 
 `./install.sh` adds a desktop entry so PyCommander shows up in your application
-launcher; `./uninstall.sh` removes it.
+launcher. It prompts for the program's install directory and the menu file to
+use, and bakes both into the desktop entry's launch command; `./uninstall.sh`
+removes the entry.
 
 ## Keys
 

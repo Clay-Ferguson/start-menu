@@ -2,8 +2,7 @@
 # PyCommander launcher.
 #
 # uv builds/refreshes the virtualenv from pyproject.toml on every run, so there
-# is no install step. --directory also makes the project root the working
-# directory, which is how a bare "menu.yaml" resolves.
+# is no install step. Usage: ./start.sh /path/to/menu.yaml
 set -euo pipefail
 
 HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
