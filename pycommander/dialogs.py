@@ -154,12 +154,15 @@ class FolderNameDialog(QDialog):
 
 
 class ItemEditDialog(QDialog):
-    """Name, file-or-sh, and launch mode for a launchable ('name:') entry.
+    """Name, file-or-sh, working directory, and launch mode for a launchable
+    ('name:') entry.
 
     Reused for editing an existing item and creating a new one — same as
     `FolderNameDialog`, the `title` decides which. A radio pair picks whether
     the item runs a `file:` on disk or an inline `sh:` snippet; only the
     matching editor for that choice is shown, swapped via a QStackedWidget.
+    The working directory (`cwd:`) is required and applies to both kinds, so
+    it sits below the stacked file/sh editor rather than inside either page.
     """
 
     def __init__(
@@ -168,6 +171,7 @@ class ItemEditDialog(QDialog):
         file: str | None = None,
         sh: str | None = None,
         launch: str = DEFAULT_LAUNCH,
+        cwd: str | None = None,
         parent: QWidget | None = None,
         title: str = "Edit Item",
         editor: str = "",
@@ -175,7 +179,7 @@ class ItemEditDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
-        self.resize(680, 640)
+        self.resize(680, 700)
         self._editor = editor
 
         name_label = QLabel("Name:")
@@ -254,6 +258,22 @@ class ItemEditDialog(QDialog):
         )
         self._sh_radio.toggled.connect(lambda checked: checked and self._stack.setCurrentIndex(1))
 
+        # Required on every launchable item (see menu.py's resolved_cwd) — the
+        # working directory the script or sh: snippet runs from. Shown below
+        # the file/sh picker regardless of which of those is selected, since
+        # both need one.
+        cwd_label = QLabel("Working directory:")
+        cwd_label.setStyleSheet(LABEL_STYLE)
+        self._cwd_edit = QLineEdit(cwd or "")
+        self._cwd_edit.setStyleSheet(_field_style())
+        pick_cwd_button = QPushButton("Pick Folder…")
+        pick_cwd_button.setStyleSheet(BUTTON_STYLE)
+        pick_cwd_button.clicked.connect(self._pick_cwd)
+
+        cwd_button_row = QHBoxLayout()
+        cwd_button_row.addWidget(pick_cwd_button)
+        cwd_button_row.addStretch(1)
+
         launch_label = QLabel("Launch:")
         launch_label.setStyleSheet(LABEL_STYLE)
         self._launch_combo = QComboBox()
@@ -295,6 +315,9 @@ class ItemEditDialog(QDialog):
         frame_layout.addWidget(self._name_edit)
         frame_layout.addLayout(type_row)
         frame_layout.addWidget(self._stack, 1)
+        frame_layout.addWidget(cwd_label)
+        frame_layout.addWidget(self._cwd_edit)
+        frame_layout.addLayout(cwd_button_row)
         frame_layout.addWidget(launch_label)
         frame_layout.addLayout(launch_row)
         frame_layout.addWidget(buttons)
@@ -306,16 +329,37 @@ class ItemEditDialog(QDialog):
         self._name_edit.textChanged.connect(self._validate)
         self._file_edit.textChanged.connect(self._validate)
         self._sh_edit.textChanged.connect(self._validate)
+        self._cwd_edit.textChanged.connect(self._validate)
         self._file_radio.toggled.connect(self._validate)
         self._validate()
         self._name_edit.setFocus()
         self._name_edit.selectAll()
 
     def _pick_file(self) -> None:
-        start = self._file_edit.text().strip() or os.path.expanduser("~")
+        # `file:` is often just a bare name once a prior pick has split it
+        # (below), so it's not a usable start location on its own; the
+        # folder currently in `cwd:` is a better guess of where to reopen.
+        file_text = self._file_edit.text().strip()
+        if file_text and os.path.isabs(os.path.expanduser(file_text)):
+            start = file_text
+        else:
+            start = self._cwd_edit.text().strip() or os.path.expanduser("~")
         path, _ = QFileDialog.getOpenFileName(self, "Select script file", start)
+        if not path:
+            return
+        # Split the picked path: the file name alone goes in `file:`, and its
+        # containing folder becomes `cwd:` — that's what a user picking a
+        # script almost always wants, so this overwrites whatever was already
+        # in the working-directory field rather than leaving it alone.
+        directory, name = os.path.split(path)
+        self._file_edit.setText(name)
+        self._cwd_edit.setText(directory)
+
+    def _pick_cwd(self) -> None:
+        start = self._cwd_edit.text().strip() or os.path.expanduser("~")
+        path = QFileDialog.getExistingDirectory(self, "Select working directory", start)
         if path:
-            self._file_edit.setText(path)
+            self._cwd_edit.setText(path)
 
     def _edit_file(self) -> None:
         path = self._file_edit.text().strip()
@@ -327,19 +371,21 @@ class ItemEditDialog(QDialog):
             QMessageBox.critical(self, "Cannot edit file", error)
 
     def _validate(self) -> None:
-        # A blank name, or a blank file/sh for whichever type is selected,
-        # would leave the item unusable, so Save stays disabled.
+        # A blank name, a blank file/sh for whichever type is selected, or a
+        # blank cwd would leave the item unusable, so Save stays disabled.
         name_ok = bool(self._name_edit.text().strip())
         file_ok = bool(self._file_edit.text().strip())
         content_ok = bool(self._sh_edit.toPlainText().strip()) if self._sh_radio.isChecked() else file_ok
-        self._save_button.setEnabled(name_ok and content_ok)
+        cwd_ok = bool(self._cwd_edit.text().strip())
+        self._save_button.setEnabled(name_ok and content_ok and cwd_ok)
         # Edit only makes sense once there's a path to open.
         self._edit_file_button.setEnabled(file_ok)
 
-    def results(self) -> tuple[str, str | None, str | None, str]:
-        """The dialog's fields as `(name, file, sh, launch)`, ready for a MenuNode."""
+    def results(self) -> tuple[str, str | None, str | None, str, str]:
+        """The dialog's fields as `(name, file, sh, launch, cwd)`, ready for a MenuNode."""
         name = self._name_edit.text().strip()
         launch = self._launch_combo.currentData()
+        cwd = self._cwd_edit.text().strip()
         if self._sh_radio.isChecked():
-            return name, None, self._sh_edit.toPlainText(), launch
-        return name, self._file_edit.text().strip(), None, launch
+            return name, None, self._sh_edit.toPlainText(), launch, cwd
+        return name, self._file_edit.text().strip(), None, launch, cwd

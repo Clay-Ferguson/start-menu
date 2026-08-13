@@ -90,12 +90,15 @@ menu:
       - name: backup
         file: /home/clay/ferguson/scripts/backup/backup.sh
         launch: terminal
+        cwd: /home/clay/ferguson/scripts/backup
       - name: status
         file: ~/ferguson/projects/llama-deck/status.sh
         launch: hold
+        cwd: ~/ferguson/projects/llama-deck
 
   - name: Disk report                # inline: no script file needed
     launch: hold
+    cwd: ~
     sh: |
       echo "Free space:"
       df -h /
@@ -104,6 +107,7 @@ menu:
   - name: Lingo Web
     file: /home/clay/ferguson/commander/scripts/Lingo Web.sh
     launch: detached
+    cwd: /home/clay/ferguson/commander/scripts
 ```
 
 | Key | Applies to | Required | Meaning |
@@ -114,7 +118,7 @@ menu:
 | `file` | script | one of | Path to a shell script. `~` and `$VARS` are expanded and symlinks resolved |
 | `sh` | script | `file`/`sh` | Shell commands written inline, one line or many |
 | `launch` | script | no | How to run it (see below). Default `terminal` |
-| `cwd` | script | no | Working directory. Defaults to the script's own directory for `file:`, to `$HOME` for `sh:` |
+| `cwd` | script | yes | Working directory to run in. `~` and `$VARS` are expanded. There is no default — an item with no `cwd:`, or one pointing at a folder that no longer exists, fails with a dialog when you try to launch it, rather than at startup |
 | `icon` | all | no | An icon theme name (`utilities-terminal`) or a path to an image file. Defaults to a folder icon for sections, a file icon for scripts |
 
 ### Inline `sh:` snippets

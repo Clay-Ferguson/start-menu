@@ -173,7 +173,8 @@ currently shown on screen.
 
 Click a launchable item's ✎ **edit** icon. The same [item editor
 dialog](#the-item-editor-dialog) opens, pre-filled with that item's current
-name, file/script, and launch mode. Change what you like and click **Save**.
+name, file/script, working directory, and launch mode. Change what you like
+and click **Save**.
 
 ### The Item Editor Dialog
 
@@ -194,15 +195,33 @@ existing one — the fields work identically either way.
 
   Switching between the two radio buttons swaps which editor is shown; only
   one of the two is ever saved (whichever is currently selected).
+- **Working directory** — a text field for the folder the item runs
+  from, plus a **Pick Folder…** button that opens a standard folder-browser
+  dialog so you don't have to type the path by hand. This applies whether the
+  item is a **File** or a **Bash script**, and is required — see [Working
+  Directory](#working-directory-cwd) below.
 - **Launch** — a dropdown choosing how the item runs, with the same three
   modes described in [Launching an Item](#launching-an-item): *Detached (no
   window)*, *Terminal (closes when it exits)*, and *Hold (stays open until
   you press Enter)*.
 
-**Save** stays disabled until the Name field and the selected content field
-(File path or Bash script text) both have something in them — an item can't
-be saved half-finished. **Cancel** discards whatever you've typed and closes
-the dialog without changing anything.
+**Save** stays disabled until the Name field, the selected content field
+(File path or Bash script text), and the Working directory field all have
+something in them — an item can't be saved half-finished. **Cancel** discards
+whatever you've typed and closes the dialog without changing anything.
+
+### Working Directory
+
+Every launchable item needs a working directory — the folder it runs from.
+There's no automatic default (e.g. a script's own folder); it's a required
+field you fill in yourself, in the [item editor
+dialog](#the-item-editor-dialog) or as `cwd:` in the YAML.
+
+If an item's working directory is left empty or points at a folder that no
+longer exists, launching it doesn't fail silently — a dialog explains the
+problem at the moment you try to launch it, the same as a missing script file
+does (see [Launching an Item](#launching-an-item)). A menu file written before
+`cwd:` existed will hit this on every item until you edit each one to add it.
 
 ### Deleting an Item
 
@@ -274,9 +293,11 @@ menu:
         icon: firefox
         file: /usr/bin/firefox
         launch: detached
+        cwd: ~
 
   - name: Disk report
     launch: hold
+    cwd: ~
     sh: |
       echo "Free space:"
       df -h /
@@ -297,7 +318,7 @@ menu:
 | Key | Applies to | Meaning |
 |---|---|---|
 | `launch` | script | `detached`, `terminal`, or `hold` (see [Launching an Item](#launching-an-item)); defaults to `terminal` |
-| `cwd` | script | Working directory to run in. Defaults to the script's own directory for `file:`, or `$HOME` for `sh:` |
+| `cwd` | script | Working directory to run in. Required — see [Working Directory](#working-directory-cwd) |
 | `icon` | folder or script | An icon theme name, or a path to an image file |
 | `options.editor` | top-level setting | The shell command `e` uses to open this file; may include arguments (e.g. `code -n`) |
 
@@ -316,6 +337,7 @@ menu.yaml has 2 problem(s):
 
 Any reported problem prevents the window from opening at all, since the menu
 tree can't be trusted to be complete — fix the file and start PyCommander
-again. A missing script file is *not* caught at this stage (it might live on
-a drive that isn't mounted yet); that's only reported if you try to launch
-it.
+again. A missing script file, or a missing or empty `cwd:`, is *not* caught at
+this stage (a script might live on a drive that isn't mounted yet, and an item
+edited before `cwd:` existed simply has none); those are only reported if you
+try to launch the item — see [Working Directory](#working-directory-cwd).

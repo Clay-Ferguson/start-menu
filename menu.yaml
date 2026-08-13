@@ -20,27 +20,32 @@ menu:
         icon: firefox
         file: /usr/bin/firefox
         launch: detached        # GUI app: no terminal window wanted
+        cwd: ~
 
       - name: Files
         icon: system-file-manager
         file: /usr/bin/nautilus
         launch: detached
+        cwd: ~
 
       - name: Terminal
         icon: utilities-terminal
         file: /usr/bin/gnome-terminal
         launch: detached
+        cwd: ~
 
       - name: Calculator
         icon: accessories-calculator
         file: /usr/bin/gnome-calculator
         launch: detached
+        cwd: ~
 
   - folder: Shell Script Examples
     icon: utilities-terminal
     items:
       - name: System Info
         launch: hold            # window stays open afterward so you can read it
+        cwd: ~
         sh: |
           echo "Hostname:  $(hostname)"
           echo "Kernel:    $(uname -sr)"
@@ -54,6 +59,7 @@ menu:
 
       - name: Network Check
         launch: hold
+        cwd: ~
         sh: |
           echo "Local IP address(es):"
           hostname -I

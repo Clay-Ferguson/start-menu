@@ -30,12 +30,21 @@ def launch(node: MenuNode) -> str | None:
     """Run `node`'s script. Returns an error message, or None on success."""
     if node.is_section:
         return f"'{node.name}' is a section, not a script."
-    if node.file is not None and not os.path.isfile(node.resolved_file):
-        return f"Cannot launch '{node.name}':\n\n{node.resolved_file}\n\nNo such file."
 
+    # Checked before `file:`, since a relative `file:` (e.g. a bare filename
+    # from "Pick File…" — see dialogs.py) only resolves against a valid `cwd:`.
     cwd = node.resolved_cwd
+    if not cwd:
+        return (
+            f"Cannot launch '{node.name}':\n\n"
+            "No working directory is set for this item.\n\n"
+            "Edit the item and choose one."
+        )
     if not os.path.isdir(cwd):
         return f"Cannot launch '{node.name}':\n\nWorking directory does not exist:\n{cwd}"
+
+    if node.file is not None and not os.path.isfile(node.resolved_file):
+        return f"Cannot launch '{node.name}':\n\n{node.resolved_file}\n\nNo such file."
 
     cmd = build_command(node)
 

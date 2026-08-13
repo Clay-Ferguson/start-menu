@@ -64,26 +64,39 @@ class MenuNode:
 
     @property
     def resolved_file(self) -> str | None:
-        """The script path with ~ and $VARs expanded and symlinks followed."""
+        """The script path, resolved against `cwd:` if it isn't already absolute.
+
+        `~` and $VARs are expanded either way, and symlinks are followed once
+        the path is absolute. A bare filename — what the "Pick File…" button
+        now produces, splitting the folder out into `cwd:` (see dialogs.py) —
+        only means anything relative to the item's working directory, so it's
+        joined with `cwd:` first. A path that's already absolute (or expands
+        to one) ignores `cwd:` entirely, the same as before that existed. If
+        `cwd:` isn't set, a relative `file:` is left unresolved rather than
+        guessed at against some other directory.
+        """
         if self.file is None:
             return None
-        return _expand(self.file)
+        expanded = os.path.expanduser(os.path.expandvars(self.file))
+        if os.path.isabs(expanded):
+            return os.path.realpath(expanded)
+        if self.cwd:
+            return os.path.realpath(os.path.join(_expand(self.cwd), expanded))
+        return expanded
 
     @property
     def resolved_cwd(self) -> str | None:
-        """Working directory: `cwd` if given, else a sensible default.
+        """Working directory with ~ and $VARs expanded, or None if unset.
 
-        A `file` script runs from its own directory, the way Commander ran it.
-        An inline `sh` snippet has no directory of its own, so it starts in
-        $HOME — the same place a freshly opened terminal would.
+        `cwd` is required on every launchable item — there is no longer a
+        fallback to the script's own directory or $HOME. A menu file written
+        before `cwd` existed simply has `cwd is None` here; `launcher.launch`
+        is what turns that into a user-facing error at launch time, rather
+        than this failing to load the menu at all.
         """
-        if self.is_section:
+        if self.is_section or not self.cwd:
             return None
-        if self.cwd:
-            return _expand(self.cwd)
-        if self.file is not None:
-            return os.path.dirname(self.resolved_file)
-        return os.path.expanduser("~")
+        return _expand(self.cwd)
 
 
 def _expand(path: str) -> str:

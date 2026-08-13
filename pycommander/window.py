@@ -513,19 +513,21 @@ class MainWindow(QWidget):
             node.file,
             node.sh,
             node.launch,
+            node.cwd,
             self,
             title="Edit Item",
             editor=self.options.resolved_editor(),
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        name, file, sh, launch = dialog.results()
+        name, file, sh, launch, cwd = dialog.results()
         if not name:
             return
         node.name = name
         node.file = file
         node.sh = sh
         node.launch = launch
+        node.cwd = cwd
         self._save_and_reload()
 
     def _handle_delete_icon(self, index: QModelIndex) -> None:
@@ -584,10 +586,12 @@ class MainWindow(QWidget):
         dialog = ItemEditDialog(parent=self, title="Create Item", editor=self.options.resolved_editor())
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        name, file, sh, launch = dialog.results()
+        name, file, sh, launch, cwd = dialog.results()
         if not name:
             return
-        self._current_level_nodes().append(MenuNode(name=name, file=file, sh=sh, launch=launch))
+        self._current_level_nodes().append(
+            MenuNode(name=name, file=file, sh=sh, launch=launch, cwd=cwd)
+        )
         self._save_and_reload(select_name=name)
 
     def _current_level_nodes(self) -> list[MenuNode]:

@@ -34,6 +34,7 @@ def _create_starter_menu(path: str) -> None:
             name=STARTER_ITEM_NAME,
             sh='echo "Edit this menu to add your own items."',
             launch=LAUNCH_HOLD,
+            cwd="~",
         )
     ]
     dump_menu(path, starter, Options())
