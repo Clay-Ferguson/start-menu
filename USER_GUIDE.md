@@ -83,7 +83,7 @@ working directory, or no terminal emulator available), a dialog explains what
 happened. A script file living on a drive that isn't currently mounted, for
 example, isn't detected until you actually try to launch it.
 
-Every launchable item runs in one of three ways, decided when the item was
+Every launchable item runs in one of four ways, decided when the item was
 created or edited:
 
 | Mode | What you see | Typical use |
@@ -91,6 +91,7 @@ created or edited:
 | **Detached (no terminal)** | Nothing — it runs silently in the background | GUI applications: browsers, editors, file managers |
 | **Terminal (terminal auto-closes)** | A new terminal window that closes the instant the command finishes | Interactive commands, or anything that prompts you |
 | **Hold (terminal stays open)** | A new terminal window that stays open after the command finishes, showing its exit status, until you press Enter | Commands that print a report and then exit quickly, so you have time to read the output |
+| **Tmux (session keeps running)** | A new terminal window showing the command running inside a named tmux session; closing the window leaves it running | Long-running things — a server, a watcher, a long build — you want to leave running and check back on later (see [Tmux Sessions](#tmux-sessions)) |
 
 ### Quitting
 
@@ -200,15 +201,23 @@ existing one — the fields work identically either way.
   dialog so you don't have to type the path by hand. This applies whether the
   item is a **File** or a **Bash script**, and is required — see [Working
   Directory](#working-directory-cwd) below.
-- **Launch** — a dropdown choosing how the item runs, with the same three
+- **Launch** — a dropdown choosing how the item runs, with the same four
   modes described in [Launching an Item](#launching-an-item): *Detached (no
-  window)*, *Terminal (closes when it exits)*, and *Hold (stays open until
-  you press Enter)*.
+  window)*, *Terminal (terminal auto-closes)*, *Hold (terminal stays open)*,
+  and *Tmux (session keeps running)*.
+- **Tmux session name** — a text field that appears **only** when the launch
+  mode is set to *Tmux*, naming the session the item attaches to. It accepts
+  letters, digits, `_` and `-` only; other characters simply won't type. See
+  [Tmux Sessions](#tmux-sessions).
 
 **Save** stays disabled until the Name field, the selected content field
 (File path or Bash script text), and the Working directory field all have
-something in them — an item can't be saved half-finished. **Cancel** discards
-whatever you've typed and closes the dialog without changing anything.
+something in them — plus the Tmux session name, if the Tmux launch mode is
+selected. An item can't be saved half-finished. **Cancel** discards whatever
+you've typed and closes the dialog without changing anything.
+
+Switching the launch mode away from *Tmux* hides the session-name field but
+doesn't forget what you typed in it — switch back and it's still there.
 
 ### Working Directory
 
@@ -222,6 +231,51 @@ longer exists, launching it doesn't fail silently — a dialog explains the
 problem at the moment you try to launch it, the same as a missing script file
 does (see [Launching an Item](#launching-an-item)). A menu file written before
 `cwd:` existed will hit this on every item until you edit each one to add it.
+
+### Tmux Sessions
+
+Normally, closing a terminal window kills whatever was running in it. That's
+fine for a script that finishes on its own, but not for something you want to
+leave running — a development server, a long build, a download. The **Tmux**
+launch mode solves that by running the item inside a named
+[tmux](https://github.com/tmux/tmux) session, which keeps running whether or
+not any window is showing it.
+
+What that looks like in practice:
+
+- **Launch the item.** A terminal window opens with your command running in
+  it, and a reminder in the status bar at the bottom: `Ctrl+B D = detach`.
+- **Close the window** — either by pressing `Ctrl+B` then `D`, or just closing
+  it with the mouse. Both are safe: the command keeps running in the
+  background.
+- **Launch the same item again later.** Instead of starting a second copy, it
+  reconnects you to the one already running, with all its earlier output still
+  scrolled back behind it.
+- **If the command has finished or crashed** in the meantime, launching starts
+  it fresh. Its last output is kept on screen rather than disappearing with
+  the window, so a command that fails immediately still leaves you something
+  to read.
+
+Each Tmux item needs a **session name** — this is what PyCommander uses to
+find the running session again next time. Give each item its own name unless
+you deliberately want two items to share one session; two items with the same
+name will connect to the same running command.
+
+Session names allow letters, digits, `_` and `-` only. (tmux itself treats
+`:` and `.` as separators inside a session name, so allowing them would make
+PyCommander connect to the wrong thing.) The item editor's field simply won't
+accept other characters.
+
+This mode requires the `tmux` program to be installed. On Ubuntu or Debian:
+`sudo apt install tmux`. Like a missing script file or working directory, a
+missing `tmux`, a missing session name, or one containing illegal characters
+(possible only if the menu file was hand-edited) isn't reported when
+PyCommander starts — you get a dialog explaining it at the moment you try to
+launch the item.
+
+A session started this way is also reachable from any ordinary terminal with
+`tmux attach -t <session name>`, and `tmux ls` lists everything currently
+running.
 
 ### Deleting an Item
 
@@ -317,8 +371,9 @@ menu:
 
 | Key | Applies to | Meaning |
 |---|---|---|
-| `launch` | script | `detached`, `terminal`, or `hold` (see [Launching an Item](#launching-an-item)); defaults to `terminal` |
+| `launch` | script | `detached`, `terminal`, `hold`, or `tmux` (see [Launching an Item](#launching-an-item)); defaults to `terminal` |
 | `cwd` | script | Working directory to run in. Required — see [Working Directory](#working-directory-cwd) |
+| `tmux_session` | script | Name of the tmux session to use. Required when `launch: tmux`, ignored otherwise — see [Tmux Sessions](#tmux-sessions) |
 | `icon` | folder or script | An icon theme name, or a path to an image file |
 | `options.editor` | top-level setting | The shell command `e` uses to open this file; may include arguments (e.g. `code -n`) |
 
@@ -331,13 +386,15 @@ the first one), each tagged with the offending entry's location, e.g.:
 ```
 menu.yaml has 2 problem(s):
 
-  • menu[2].items[1] (status): unknown launch mode 'bogus'; expected one of detached, hold, terminal.
+  • menu[2].items[1] (status): unknown launch mode 'bogus'; expected one of detached, hold, terminal, tmux.
   • menu[4] (Lingo Web): has both 'items:' and 'file:' — an item is either a section (items) or a script (file), not both.
 ```
 
 Any reported problem prevents the window from opening at all, since the menu
 tree can't be trusted to be complete — fix the file and start PyCommander
-again. A missing script file, or a missing or empty `cwd:`, is *not* caught at
-this stage (a script might live on a drive that isn't mounted yet, and an item
-edited before `cwd:` existed simply has none); those are only reported if you
-try to launch the item — see [Working Directory](#working-directory-cwd).
+again. A missing script file, a missing or empty `cwd:`, or a missing or
+malformed `tmux_session:`, is *not* caught at this stage (a script might live
+on a drive that isn't mounted yet, and an item edited before `cwd:` existed
+simply has none); those are only reported if you try to launch the item — see
+[Working Directory](#working-directory-cwd) and [Tmux
+Sessions](#tmux-sessions).

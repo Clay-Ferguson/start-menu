@@ -39,7 +39,7 @@ from PyQt6.QtWidgets import (
 from . import APP_NAME, UI_POINT_SIZE
 from .dialogs import FolderNameDialog, ItemEditDialog
 from .launcher import launch
-from .menu import MenuNode, Options, dump_menu, load_menu
+from .menu import LAUNCH_TMUX, MenuNode, Options, dump_menu, load_menu
 from .utils import open_in_editor
 
 NODE_ROLE = Qt.ItemDataRole.UserRole
@@ -514,13 +514,14 @@ class MainWindow(QWidget):
             node.sh,
             node.launch,
             node.cwd,
+            node.tmux_session,
             self,
             title="Edit Item",
             editor=self.options.resolved_editor(),
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        name, file, sh, launch, cwd = dialog.results()
+        name, file, sh, launch, cwd, tmux_session = dialog.results()
         if not name:
             return
         node.name = name
@@ -528,6 +529,7 @@ class MainWindow(QWidget):
         node.sh = sh
         node.launch = launch
         node.cwd = cwd
+        node.tmux_session = tmux_session
         self._save_and_reload()
 
     def _handle_delete_icon(self, index: QModelIndex) -> None:
@@ -586,11 +588,13 @@ class MainWindow(QWidget):
         dialog = ItemEditDialog(parent=self, title="Create Item", editor=self.options.resolved_editor())
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        name, file, sh, launch, cwd = dialog.results()
+        name, file, sh, launch, cwd, tmux_session = dialog.results()
         if not name:
             return
         self._current_level_nodes().append(
-            MenuNode(name=name, file=file, sh=sh, launch=launch, cwd=cwd)
+            MenuNode(
+                name=name, file=file, sh=sh, launch=launch, cwd=cwd, tmux_session=tmux_session
+            )
         )
         self._save_and_reload(select_name=name)
 
@@ -678,14 +682,20 @@ class MainWindow(QWidget):
 
 def _tooltip(node: MenuNode) -> str:
     """What the item points at: a path, the snippet itself, or a child count."""
+    if node.is_section:
+        return f"{len(node.children)} items"
     if node.sh is not None:
         lines = node.sh.strip().splitlines()
         if len(lines) > TOOLTIP_LINES:
             lines = lines[:TOOLTIP_LINES] + [f"… {len(lines) - TOOLTIP_LINES} more lines"]
-        return "\n".join(lines)
-    if node.file is not None:
-        return node.resolved_file
-    return f"{len(node.children)} items"
+        text = "\n".join(lines)
+    else:
+        text = node.resolved_file
+    if node.launch == LAUNCH_TMUX and node.tmux_session:
+        # Which session an item attaches to isn't visible anywhere else, and
+        # two items can deliberately share one, so it's worth a line here.
+        text += f"\n\ntmux session: {node.tmux_session}"
+    return text
 
 
 def format_errors(menu_path: str, errors: list[str]) -> str:

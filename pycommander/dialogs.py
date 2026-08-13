@@ -2,7 +2,7 @@
 
 One dialog class per editable thing: a folder's name (`FolderNameDialog`,
 shared between renaming an existing folder and naming a brand new one), and
-a launchable item's name/file-or-sh/launch mode (`ItemEditDialog`, same
+a launchable item's name/file-or-sh/cwd/launch mode (`ItemEditDialog`, same
 reuse between edit and create). Item reordering has no dialog of its own —
 it's driven straight from the row's up/down icons.
 """
@@ -11,7 +11,14 @@ from __future__ import annotations
 
 import os
 
-from PyQt6.QtGui import QColor, QFontDatabase, QFontMetrics, QPalette
+from PyQt6.QtCore import QRegularExpression
+from PyQt6.QtGui import (
+    QColor,
+    QFontDatabase,
+    QFontMetrics,
+    QPalette,
+    QRegularExpressionValidator,
+)
 from PyQt6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -34,7 +41,14 @@ from PyQt6.QtWidgets import (
 )
 
 from . import UI_POINT_SIZE
-from .menu import DEFAULT_LAUNCH, LAUNCH_DETACHED, LAUNCH_HOLD, LAUNCH_MODES, LAUNCH_TERMINAL
+from .menu import (
+    DEFAULT_LAUNCH,
+    LAUNCH_DETACHED,
+    LAUNCH_HOLD,
+    LAUNCH_MODES,
+    LAUNCH_TERMINAL,
+    LAUNCH_TMUX,
+)
 from .utils import open_in_editor
 
 # A plain QDialog's outer edge is easy to lose against the desktop behind it,
@@ -50,7 +64,12 @@ LAUNCH_LABELS = {
     LAUNCH_DETACHED: "Detached (no window)",
     LAUNCH_TERMINAL: "Terminal (terminal auto-closes)",
     LAUNCH_HOLD: "Hold (terminal stays open)",
+    LAUNCH_TMUX: "Tmux (session keeps running)",
 }
+
+# Same restriction launcher.py enforces on a hand-edited menu file; here it
+# stops the offending characters being typed in the first place.
+TMUX_SESSION_PATTERN = r"[A-Za-z0-9_-]*"
 
 # The sh editor is sized to comfortably show a script this big without
 # scrolling; longer scripts just scroll normally.
@@ -172,6 +191,7 @@ class ItemEditDialog(QDialog):
         sh: str | None = None,
         launch: str = DEFAULT_LAUNCH,
         cwd: str | None = None,
+        tmux_session: str | None = None,
         parent: QWidget | None = None,
         title: str = "Edit Item",
         editor: str = "",
@@ -296,6 +316,19 @@ class ItemEditDialog(QDialog):
         launch_row.addWidget(self._launch_combo)
         launch_row.addStretch(1)
 
+        # Only meaningful under the tmux launch mode, so the label and field
+        # are shown only while that mode is picked (_update_tmux_visibility) —
+        # the same "the control decides what's on screen" idea as the file/sh
+        # radio pair driving the stack above, just a plain show/hide since
+        # there's one field rather than two whole pages.
+        self._tmux_label = QLabel("Tmux session name:")
+        self._tmux_label.setStyleSheet(LABEL_STYLE)
+        self._tmux_edit = QLineEdit(tmux_session or "")
+        self._tmux_edit.setStyleSheet(_field_style())
+        self._tmux_edit.setValidator(
+            QRegularExpressionValidator(QRegularExpression(TMUX_SESSION_PATTERN), self)
+        )
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
         )
@@ -320,6 +353,8 @@ class ItemEditDialog(QDialog):
         frame_layout.addLayout(cwd_button_row)
         frame_layout.addWidget(launch_label)
         frame_layout.addLayout(launch_row)
+        frame_layout.addWidget(self._tmux_label)
+        frame_layout.addWidget(self._tmux_edit)
         frame_layout.addWidget(buttons)
 
         outer_layout = QVBoxLayout(self)
@@ -331,9 +366,18 @@ class ItemEditDialog(QDialog):
         self._sh_edit.textChanged.connect(self._validate)
         self._cwd_edit.textChanged.connect(self._validate)
         self._file_radio.toggled.connect(self._validate)
+        self._tmux_edit.textChanged.connect(self._validate)
+        self._launch_combo.currentIndexChanged.connect(self._update_tmux_visibility)
+        self._launch_combo.currentIndexChanged.connect(self._validate)
         self._validate()
+        self._update_tmux_visibility()  # so a freshly opened dialog starts right
         self._name_edit.setFocus()
         self._name_edit.selectAll()
+
+    def _update_tmux_visibility(self) -> None:
+        is_tmux = self._launch_combo.currentData() == LAUNCH_TMUX
+        self._tmux_label.setVisible(is_tmux)
+        self._tmux_edit.setVisible(is_tmux)
 
     def _pick_file(self) -> None:
         # `file:` is often just a bare name once a prior pick has split it
@@ -372,20 +416,33 @@ class ItemEditDialog(QDialog):
 
     def _validate(self) -> None:
         # A blank name, a blank file/sh for whichever type is selected, or a
-        # blank cwd would leave the item unusable, so Save stays disabled.
+        # blank cwd would leave the item unusable, so Save stays disabled. A
+        # tmux item needs a session name for the same reason — but only while
+        # that mode is the one selected.
         name_ok = bool(self._name_edit.text().strip())
         file_ok = bool(self._file_edit.text().strip())
         content_ok = bool(self._sh_edit.toPlainText().strip()) if self._sh_radio.isChecked() else file_ok
         cwd_ok = bool(self._cwd_edit.text().strip())
-        self._save_button.setEnabled(name_ok and content_ok and cwd_ok)
+        tmux_ok = (
+            bool(self._tmux_edit.text().strip())
+            if self._launch_combo.currentData() == LAUNCH_TMUX
+            else True
+        )
+        self._save_button.setEnabled(name_ok and content_ok and cwd_ok and tmux_ok)
         # Edit only makes sense once there's a path to open.
         self._edit_file_button.setEnabled(file_ok)
 
-    def results(self) -> tuple[str, str | None, str | None, str, str]:
-        """The dialog's fields as `(name, file, sh, launch, cwd)`, ready for a MenuNode."""
+    def results(self) -> tuple[str, str | None, str | None, str, str, str | None]:
+        """The fields as `(name, file, sh, launch, cwd, tmux_session)`, for a MenuNode.
+
+        The session name comes back whatever the launch mode is, so switching
+        the mode away from tmux and back doesn't quietly discard what was
+        typed; only whether it's *required* depends on the mode (`_validate`).
+        """
         name = self._name_edit.text().strip()
         launch = self._launch_combo.currentData()
         cwd = self._cwd_edit.text().strip()
+        tmux_session = self._tmux_edit.text().strip() or None
         if self._sh_radio.isChecked():
-            return name, None, self._sh_edit.toPlainText(), launch, cwd
-        return name, self._file_edit.text().strip(), None, launch, cwd
+            return name, None, self._sh_edit.toPlainText(), launch, cwd, tmux_session
+        return name, self._file_edit.text().strip(), None, launch, cwd, tmux_session

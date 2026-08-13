@@ -15,8 +15,11 @@ instead of being encoded in filenames.
 A menu item is one of three things: a **section** (`items:`, nests further
 items), a **script file** (`file:`, a path on disk), or an inline **`sh:`**
 snippet. Each script has a launch mode — `detached` (no window), `terminal`
-(window closes on exit), or `hold` (window stays open until Enter) — carried
-over from the original Commander's filename-suffix conventions.
+(window closes on exit), `hold` (window stays open until Enter), or `tmux`
+(window attaches to a named tmux session that outlives it, so closing the
+window only detaches). The first three are carried over from the original
+Commander's filename-suffix conventions; `tmux` is new, and is the only mode
+with a required extra property (`tmux_session:`) and an external dependency.
 
 ## Architecture / top-level GUI
 
@@ -26,7 +29,11 @@ over from the original Commander's filename-suffix conventions.
   full validation (all errors collected and reported at once) and the
   reverse `dump_menu()` for saving edits back out.
 - `pycommander/launcher.py` — turns a `MenuNode` into a spawned process for
-  each of the three launch modes, detached from PyCommander's own session.
+  each of the four launch modes, detached from PyCommander's own session.
+  `tmux` mode generates a shell wrapper (a port of llama-deck's `tmuxer.sh`)
+  that creates or reattaches to the session; its session-name and
+  tmux-installed checks happen in Python first, so failures are dialogs
+  rather than a terminal window that opens and immediately dies.
 - `pycommander/window.py` — the GUI: `MainWindow` (header showing the
   current breadcrumb, the `MenuTreeView`, an **Edit** toggle switch + footer
   hint bar) and `MenuTreeView` itself, a `QTreeView`/`QStandardItemModel`
@@ -36,7 +43,8 @@ over from the original Commander's filename-suffix conventions.
   edit, delete).
 - `pycommander/dialogs.py` — the two editing dialogs opened from those
   action icons: `FolderNameDialog` (rename/create a section) and
-  `ItemEditDialog` (name, file-or-inline-`sh`, launch mode for a script).
+  `ItemEditDialog` (name, file-or-inline-`sh`, working directory, launch mode
+  and — shown only for `tmux` mode — the session name, for a script).
 
 Every edit made through the GUI does a full save-and-reload round trip:
 write the in-memory tree to `menu.yaml`, then re-run it back through the

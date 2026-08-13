@@ -1,11 +1,12 @@
 """Running the picked script.
 
-Three modes, carried over unchanged from the original Commander's trailing
-underscore conventions:
+Four modes. The first three are carried over unchanged from the original
+Commander's trailing underscore conventions:
 
   detached  no terminal window at all, output discarded          (was: no suffix)
   terminal  fresh window; closes the moment the script exits     (was: "_")
   hold      fresh window; held open until the user hits Enter    (was: "__")
+  tmux      window attaches to a named tmux session that outlives it
 
 Everything is spawned with start_new_session=True and its streams pointed at
 /dev/null. That is what lets the menu window stay open after a launch: the
@@ -16,14 +17,24 @@ and no pipe can ever fill up and stall the GUI thread.
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import shutil
 import subprocess
 
-from .menu import LAUNCH_DETACHED, LAUNCH_HOLD, MenuNode
+from .menu import LAUNCH_DETACHED, LAUNCH_HOLD, LAUNCH_TMUX, MenuNode
 
 # Same preference order the original commander.sh used.
 TERMINALS = ("gnome-terminal", "konsole", "xfce4-terminal", "x-terminal-emulator", "xterm")
+
+# Stricter than tmux itself requires. tmux addresses panes as
+# `session:window.pane`, so a ':' or '.' inside the *session* name makes every
+# `-t` below aim at some other window or pane instead of the session.
+TMUX_SESSION_RE = re.compile(r"[A-Za-z0-9_-]+")
+
+# Shown in the tmux status bar, since the way out of an attached session is
+# the one thing about this mode that isn't guessable.
+TMUX_DETACH_HINT = " Ctrl+B D = detach (process keeps running) "
 
 
 def launch(node: MenuNode) -> str | None:
@@ -45,6 +56,31 @@ def launch(node: MenuNode) -> str | None:
 
     if node.file is not None and not os.path.isfile(node.resolved_file):
         return f"Cannot launch '{node.name}':\n\n{node.resolved_file}\n\nNo such file."
+
+    if node.launch == LAUNCH_TMUX:
+        session = (node.tmux_session or "").strip()
+        if not session:
+            return (
+                f"Cannot launch '{node.name}':\n\n"
+                "No tmux session name is set for this item.\n\n"
+                "Edit the item and choose one."
+            )
+        if not TMUX_SESSION_RE.fullmatch(session):
+            return (
+                f"Cannot launch '{node.name}':\n\n"
+                f"'{session}' is not a usable tmux session name.\n\n"
+                "Use only letters, digits, '_' and '-'. In particular ':' and '.'\n"
+                "are how tmux separates a session from a window or pane, so a name\n"
+                "containing either would address the wrong thing."
+            )
+        # Checked here as well as in the generated script: a PATH lookup is
+        # free and gives an instant dialog, instead of a terminal window
+        # flashing open only to fail inside it.
+        if shutil.which("tmux") is None:
+            return (
+                f"Cannot launch '{node.name}':\n\n"
+                "tmux is not installed.\n\nInstall it with:  sudo apt install tmux"
+            )
 
     cmd = build_command(node)
 
@@ -72,6 +108,10 @@ def build_command(node: MenuNode) -> str:
     multi-line program just as happily as a one-liner, and the shell running
     it *is* the terminal's only process, so the launch modes behave exactly as
     they do for a real script file.
+
+    `tmux` mode builds the same program every other mode would, then hands it
+    to `_build_tmux_wrapper` to be run inside a tmux session rather than
+    directly in the window.
     """
     hold = node.launch == LAUNCH_HOLD
     cd = f"cd {shlex.quote(node.resolved_cwd)} || exit 1"
@@ -113,6 +153,94 @@ def build_command(node: MenuNode) -> str:
             "read -r",
         ]
 
+    if node.launch == LAUNCH_TMUX:
+        # No hold-style epilogue for tmux: remain-on-exit is tmux's own version
+        # of that, and it keeps the output readable in the pane whether or not
+        # anything is attached at the time.
+        return _build_tmux_wrapper(node, "\n".join(lines), label)
+
+    return "\n".join(lines)
+
+
+def _build_tmux_wrapper(node: MenuNode, inner: str, label: str) -> str:
+    """Wrap `inner` in the script that runs it inside a named tmux session.
+
+    A port of llama-deck's hand-written tmuxer.sh, generalized from "run this
+    script path" to "run this generated command". The shape is: clear the
+    session if its process has already died, create it (detached) if it isn't
+    there, then attach. Attaching is the only part the terminal window itself
+    does, which is why closing that window merely detaches — the process
+    belongs to the tmux server, not to the window.
+
+    Built by plain concatenation rather than f-strings on purpose: tmux's own
+    format syntax ('#{pane_dead}' below) is full of braces an f-string would
+    try to evaluate.
+    """
+    name = node.tmux_session.strip()
+    session = shlex.quote(name)
+    # Two levels of quoting: the inner one makes the generated program a single
+    # argument to `bash -lc`, the outer one makes the whole `bash -lc ...`
+    # string a single argument to `tmux new-session`. `-lc` (a login shell)
+    # keeps PATH/profile behavior identical to every other launch mode.
+    shell_cmd = shlex.quote("bash -lc " + shlex.quote(inner))
+    hint = shlex.quote(TMUX_DETACH_HINT)
+
+    # printf '%s' does not expand escapes, so these need real newlines in the
+    # text itself rather than '\n' sequences.
+    no_tmux_msg = shlex.quote(
+        "tmux is not installed.  Install it with:  sudo apt install tmux\n"
+        "Press Enter to close…"
+    )
+    unattachable_msg = shlex.quote(
+        "The tmux session exists, but this window could not attach to it.\n"
+        "See it from any terminal with:  tmux attach -t " + name + "\n"
+        "Press Enter to close…"
+    )
+    died_msg = shlex.quote(
+        "The process exited immediately, before its output could be captured.\n"
+        "Run " + label + " directly to see why.\n"
+        "Press Enter to close…"
+    )
+
+    lines = [
+        # The window has no shell behind it on these paths, so anything printed
+        # would vanish with the window; hold it open the way `hold` mode does.
+        "hold() { printf '\\n%s' \"$1\"; read -r; }",
+        # Belt-and-braces: launch() already checked this in Python, which is
+        # what gives the fast dialog. This only catches tmux disappearing
+        # between the click and this script running.
+        "if ! command -v tmux >/dev/null 2>&1; then hold " + no_tmux_msg + "; exit 1; fi",
+        # A session whose process already exited is debris: attaching would show
+        # a dead pane and never start anything. remain-on-exit (set below) is
+        # what leaves it detectable here instead of the session silently
+        # vanishing along with the error output.
+        "if tmux has-session -t " + session + " 2>/dev/null; then",
+        '  if [ "$(tmux list-panes -t %s -F \'#{pane_dead}\' 2>/dev/null'
+        ' | sort -u)" = "1" ]; then' % session,
+        "    tmux kill-session -t " + session + " 2>/dev/null",
+        "  fi",
+        "fi",
+        "if ! tmux has-session -t " + session + " 2>/dev/null; then",
+        # remain-on-exit must be set in this same tmux invocation, not a
+        # following one: the likeliest real failure (a port already in use, say)
+        # exits in milliseconds, and a second tmux process cannot win that race
+        # — the session would already be gone, taking the error message with it.
+        # Chained with \; so tmux, not the outer bash, reads the semicolons.
+        "  tmux new-session -d -s " + session + " " + shell_cmd
+        + " \\; set-option -t " + session + " remain-on-exit on"
+        + " \\; set-option -t " + session + " status-right " + hint,
+        "fi",
+        "if ! tmux attach-session -t " + session + " 2>/dev/null; then",
+        # Two very different failures, and naming the wrong one sends you
+        # hunting a problem that isn't there.
+        "  if tmux has-session -t " + session + " 2>/dev/null; then",
+        "    hold " + unattachable_msg,
+        "  else",
+        "    hold " + died_msg,
+        "  fi",
+        "  exit 1",
+        "fi",
+    ]
     return "\n".join(lines)
 
 

@@ -18,11 +18,12 @@ import yaml
 LAUNCH_DETACHED = "detached"  # no window at all; output discarded
 LAUNCH_TERMINAL = "terminal"  # new window, closes when the script exits
 LAUNCH_HOLD = "hold"  # new window, held open until the user presses Enter
-LAUNCH_MODES = (LAUNCH_DETACHED, LAUNCH_TERMINAL, LAUNCH_HOLD)
+LAUNCH_TMUX = "tmux"  # window attaches to a named tmux session that outlives it
+LAUNCH_MODES = (LAUNCH_DETACHED, LAUNCH_TERMINAL, LAUNCH_HOLD, LAUNCH_TMUX)
 DEFAULT_LAUNCH = LAUNCH_TERMINAL
 
 SECTION_KEYS = {"folder", "icon", "items"}
-SCRIPT_KEYS = {"name", "icon", "file", "sh", "launch", "cwd"}
+SCRIPT_KEYS = {"name", "icon", "file", "sh", "launch", "cwd", "tmux_session"}
 OPTION_KEYS = {"editor"}
 TOP_LEVEL_KEYS = {"menu", "options"}
 
@@ -56,6 +57,7 @@ class MenuNode:
     sh: str | None = None
     launch: str = DEFAULT_LAUNCH
     cwd: str | None = None
+    tmux_session: str | None = None
     children: list["MenuNode"] = field(default_factory=list)
 
     @property
@@ -252,7 +254,24 @@ def _parse_node(raw, where: str, errors: list[str]) -> MenuNode | None:
         errors.append(f"{label}: 'cwd:' must be text, got {_kind(cwd)}.")
         cwd = None
 
-    return MenuNode(name=name, icon=icon, file=file, sh=sh, launch=launch, cwd=cwd)
+    # Only type-checked here, deliberately: whether it's present and whether
+    # its characters are legal is decided at launch time, the same as a
+    # missing `cwd:` is (see resolved_cwd), so a menu file with a half-written
+    # tmux item still loads and can be fixed in the GUI.
+    tmux_session = raw.get("tmux_session")
+    if tmux_session is not None and not isinstance(tmux_session, str):
+        errors.append(f"{label}: 'tmux_session:' must be text, got {_kind(tmux_session)}.")
+        tmux_session = None
+
+    return MenuNode(
+        name=name,
+        icon=icon,
+        file=file,
+        sh=sh,
+        launch=launch,
+        cwd=cwd,
+        tmux_session=tmux_session,
+    )
 
 
 class _MenuDumper(yaml.SafeDumper):
@@ -292,6 +311,8 @@ def _node_to_dict(node: MenuNode) -> dict:
         d["launch"] = node.launch
     if node.cwd:
         d["cwd"] = node.cwd
+    if node.tmux_session:
+        d["tmux_session"] = node.tmux_session
     return d
 
 

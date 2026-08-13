@@ -119,6 +119,7 @@ menu:
 | `sh` | script | `file`/`sh` | Shell commands written inline, one line or many |
 | `launch` | script | no | How to run it (see below). Default `terminal` |
 | `cwd` | script | yes | Working directory to run in. `~` and `$VARS` are expanded. There is no default — an item with no `cwd:`, or one pointing at a folder that no longer exists, fails with a dialog when you try to launch it, rather than at startup |
+| `tmux_session` | script | with `launch: tmux` | Name of the tmux session to create or reattach to. Letters, digits, `_` and `-` only (see [Tmux sessions](#tmux-sessions)). Like `cwd:`, a missing or malformed one is reported when you launch, not at startup |
 | `icon` | all | no | An icon theme name (`utilities-terminal`) or a path to an image file. Defaults to a folder icon for sections, a file icon for scripts |
 
 ### Inline `sh:` snippets
@@ -127,8 +128,10 @@ Use YAML's `|` block scalar for anything longer than one line — it preserves
 newlines exactly. (`>` folds them into spaces, which is almost never what you
 want for shell code.) There is no temp file involved: the snippet is handed
 straight to `bash -lc` as a whole program, and the shell running it *is* the
-terminal's only process, so all three `launch:` modes behave exactly as they do
-for a real script file.
+terminal's only process, so every `launch:` mode behaves exactly as it does for
+a real script file. (Under `tmux` the process the snippet becomes is the tmux
+*pane's*, not the window's — see [Tmux sessions](#tmux-sessions) — but that's
+equally true of a script file, so the two remain interchangeable.)
 
 Two things to know:
 
@@ -147,9 +150,10 @@ Two things to know:
 | `detached` | No terminal window at all; the script runs fully detached with its output discarded | GUI apps — editors, browsers, anything with its own window |
 | `terminal` | A fresh terminal window; the script replaces the shell, so the window closes the instant the script exits | Interactive scripts that prompt for sudo or do their own `read` |
 | `hold` | A fresh terminal window that stays open until you press Enter, showing the exit status | Scripts that print a report and exit quickly |
+| `tmux` | A fresh terminal window attached to a named [tmux session](#tmux-sessions); closing the window only detaches, and the script keeps running | Long-lived processes — servers, watchers, training runs — you want to check on later |
 
-These are the same three behaviors Commander spelled as no suffix, `_`, and
-`__` respectively.
+The first three are the same behaviors Commander spelled as no suffix, `_`, and
+`__` respectively; `tmux` is new here.
 
 Scripts always run under `bash -lc` (a *login* shell), so they see the same
 `PATH` and profile they would get from a real terminal rather than the
@@ -158,9 +162,40 @@ still runs — it just gets an explicit `bash` in front of it. An `sh:` snippet
 under `hold` runs parenthesised, so a bare `exit` in it ends the snippet rather
 than the window, and you still get the exit status and the pause.
 
-For `terminal` and `hold`, the first available terminal emulator is used, in
-this order: `gnome-terminal`, `konsole`, `xfce4-terminal`,
+For `terminal`, `hold` and `tmux`, the first available terminal emulator is
+used, in this order: `gnome-terminal`, `konsole`, `xfce4-terminal`,
 `x-terminal-emulator`, `xterm`.
+
+### Tmux sessions
+
+`launch: tmux` runs the script inside a named [tmux](https://github.com/tmux/tmux)
+session instead of directly in the terminal window. The window only ever runs
+`tmux attach-session`, so the script's own process belongs to the tmux server
+rather than to the window — which is the whole point:
+
+- **Closing the window (or `Ctrl+B` then `D`) detaches.** The script keeps
+  running, output and scrollback intact.
+- **Launching the item again reattaches** to that same live session, right
+  where you left it.
+- **If the script has since exited** — cleanly or by crashing — the dead
+  session is cleared and a fresh one started. The pane is kept after the
+  process exits (`remain-on-exit`), so a script that fails on startup leaves
+  its error on screen instead of the window vanishing before you can read it.
+
+`tmux_session:` names the session and is **required** for this mode. It's
+restricted to letters, digits, `_` and `-`: tmux addresses panes as
+`session:window.pane`, so a `:` or `.` in the session name would silently
+aim at the wrong target. The GUI's session field refuses those characters as
+you type; a hand-edited menu file gets a dialog at launch time instead.
+
+Two items sharing one `tmux_session` name deliberately share the session — the
+second one attaches to whatever the first one started rather than running its
+own command. A session that's already attached in another window is simply
+mirrored, which is tmux's normal behavior.
+
+tmux must be installed (`sudo apt install tmux`). It's checked before anything
+is spawned, so a missing tmux is a dialog rather than a terminal window that
+flashes open and dies.
 
 ### Errors
 
@@ -170,7 +205,7 @@ each tagged with the offending item's location:
 ```
 menu.yaml has 2 problem(s):
 
-  • menu[2].items[1] (status): unknown launch mode 'bogus'; expected one of detached, hold, terminal.
+  • menu[2].items[1] (status): unknown launch mode 'bogus'; expected one of detached, hold, terminal, tmux.
   • menu[4] (Lingo Web): has both 'items:' and 'file:' — an item is either a section (items) or a script (file), not both.
 ```
 
@@ -188,7 +223,7 @@ menu.yaml             example menu (see "Example menu" above); point start.sh at
 pycommander/
   __main__.py         argparse, QApplication, startup validation
   menu.py             YAML -> MenuNode tree, with validation
-  launcher.py         the three launch modes
+  launcher.py         the four launch modes
   window.py           MenuTreeView (the navigation) + MainWindow
 ```
 
