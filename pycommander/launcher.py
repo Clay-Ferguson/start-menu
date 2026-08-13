@@ -157,20 +157,23 @@ def build_command(node: MenuNode) -> str:
         # No hold-style epilogue for tmux: remain-on-exit is tmux's own version
         # of that, and it keeps the output readable in the pane whether or not
         # anything is attached at the time.
-        return _build_tmux_wrapper(node, "\n".join(lines), label)
+        return _build_tmux_wrapper(node, "\n".join(lines))
 
     return "\n".join(lines)
 
 
-def _build_tmux_wrapper(node: MenuNode, inner: str, label: str) -> str:
+def _build_tmux_wrapper(node: MenuNode, inner: str) -> str:
     """Wrap `inner` in the script that runs it inside a named tmux session.
 
-    A port of llama-deck's hand-written tmuxer.sh, generalized from "run this
-    script path" to "run this generated command". The shape is: clear the
-    session if its process has already died, create it (detached) if it isn't
-    there, then attach. Attaching is the only part the terminal window itself
-    does, which is why closing that window merely detaches — the process
-    belongs to the tmux server, not to the window.
+    Three steps: clear the session if its process has already died, create it
+    (detached) if it isn't there, then attach. Attaching is the only part the
+    terminal window itself does, which is why closing that window merely
+    detaches — the process belongs to the tmux server, not to the window.
+
+    The checks that actually fire in practice (no tmux, no session name) are
+    done in Python by `launch`, so they can be dialogs. What's left here is
+    the handful of failures that can only be discovered mid-flight, and each
+    one holds the window open to say so rather than letting it blink shut.
 
     Built by plain concatenation rather than f-strings on purpose: tmux's own
     format syntax ('#{pane_dead}' below) is full of braces an f-string would
@@ -196,9 +199,16 @@ def _build_tmux_wrapper(node: MenuNode, inner: str, label: str) -> str:
         "See it from any terminal with:  tmux attach -t " + name + "\n"
         "Press Enter to close…"
     )
+    # "Run it directly to see why" only means something when there's a file to
+    # run; an inline snippet has no such thing.
+    retry_hint = (
+        "Run " + node.resolved_file + " directly to see why."
+        if node.file is not None
+        else "Check this item's commands for something that exits straight away."
+    )
     died_msg = shlex.quote(
         "The process exited immediately, before its output could be captured.\n"
-        "Run " + label + " directly to see why.\n"
+        + retry_hint + "\n"
         "Press Enter to close…"
     )
 
@@ -206,16 +216,28 @@ def _build_tmux_wrapper(node: MenuNode, inner: str, label: str) -> str:
         # The window has no shell behind it on these paths, so anything printed
         # would vanish with the window; hold it open the way `hold` mode does.
         "hold() { printf '\\n%s' \"$1\"; read -r; }",
-        # Belt-and-braces: launch() already checked this in Python, which is
-        # what gives the fast dialog. This only catches tmux disappearing
-        # between the click and this script running.
+        # PyCommander may itself have been started from a terminal inside tmux,
+        # in which case $TMUX has been inherited all the way down to here — and
+        # tmux refuses to attach when it thinks it's nesting. This window is a
+        # brand new one, not a pane, so the inherited value is simply stale.
+        "unset TMUX TMUX_PANE",
+        # launch() already checked this in Python, which is what makes the
+        # normal case a dialog. Repeating it here isn't just belt-and-braces:
+        # without it a vanished tmux would fail every command below and be
+        # reported as "the process exited immediately", which is the wrong
+        # thing to go hunting for.
         "if ! command -v tmux >/dev/null 2>&1; then hold " + no_tmux_msg + "; exit 1; fi",
         # A session whose process already exited is debris: attaching would show
         # a dead pane and never start anything. remain-on-exit (set below) is
         # what leaves it detectable here instead of the session silently
         # vanishing along with the error output.
+        #
+        # `-s` covers every window in the session, not just its current one,
+        # and `sort -u` collapses the result, so this reads as "every pane in
+        # there is dead" — if the user has split off something that's still
+        # alive, we reattach to it instead of killing their session.
         "if tmux has-session -t " + session + " 2>/dev/null; then",
-        '  if [ "$(tmux list-panes -t %s -F \'#{pane_dead}\' 2>/dev/null'
+        '  if [ "$(tmux list-panes -s -t %s -F \'#{pane_dead}\' 2>/dev/null'
         ' | sort -u)" = "1" ]; then' % session,
         "    tmux kill-session -t " + session + " 2>/dev/null",
         "  fi",
@@ -226,8 +248,11 @@ def _build_tmux_wrapper(node: MenuNode, inner: str, label: str) -> str:
         # exits in milliseconds, and a second tmux process cannot win that race
         # — the session would already be gone, taking the error message with it.
         # Chained with \; so tmux, not the outer bash, reads the semicolons.
+        #
+        # -w because remain-on-exit is a window option (it lands on the window
+        # just created); status-right is a session option, so it takes none.
         "  tmux new-session -d -s " + session + " " + shell_cmd
-        + " \\; set-option -t " + session + " remain-on-exit on"
+        + " \\; set-option -w -t " + session + " remain-on-exit on"
         + " \\; set-option -t " + session + " status-right " + hint,
         "fi",
         "if ! tmux attach-session -t " + session + " 2>/dev/null; then",

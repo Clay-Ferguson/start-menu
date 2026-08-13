@@ -17,8 +17,7 @@ items), a **script file** (`file:`, a path on disk), or an inline **`sh:`**
 snippet. Each script has a launch mode — `detached` (no window), `terminal`
 (window closes on exit), `hold` (window stays open until Enter), or `tmux`
 (window attaches to a named tmux session that outlives it, so closing the
-window only detaches). The first three are carried over from the original
-Commander's filename-suffix conventions; `tmux` is new, and is the only mode
+window only detaches). `tmux` is the only mode
 with a required extra property (`tmux_session:`) and an external dependency.
 
 ## Architecture / top-level GUI
@@ -30,10 +29,11 @@ with a required extra property (`tmux_session:`) and an external dependency.
   reverse `dump_menu()` for saving edits back out.
 - `pycommander/launcher.py` — turns a `MenuNode` into a spawned process for
   each of the four launch modes, detached from PyCommander's own session.
-  `tmux` mode generates a shell wrapper (a port of llama-deck's `tmuxer.sh`)
-  that creates or reattaches to the session; its session-name and
-  tmux-installed checks happen in Python first, so failures are dialogs
-  rather than a terminal window that opens and immediately dies.
+  `tmux` mode wraps the command it would otherwise have run in a generated
+  shell script that creates or reattaches to the session; its session-name
+  and tmux-installed checks happen in Python first, so the failures that
+  actually happen are dialogs rather than a terminal window that opens and
+  immediately dies.
 - `pycommander/window.py` — the GUI: `MainWindow` (header showing the
   current breadcrumb, the `MenuTreeView`, an **Edit** toggle switch + footer
   hint bar) and `MenuTreeView` itself, a `QTreeView`/`QStandardItemModel`
