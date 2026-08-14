@@ -30,6 +30,10 @@ def open_in_editor(path: str, editor: str) -> str | None:
             f"The editor '{binary or editor}' was not found on PATH.\n\n"
             f"Set 'editor:' under 'options:' in the menu file to one you have."
         )
+    # abspath first: a bare name ("menu.yaml") has an empty dirname, and launch()
+    # treats an empty cwd as "no working directory is set" and refuses to run —
+    # an error about the folder, for what is really just an unqualified path.
+    path = os.path.abspath(path)
     node = MenuNode(
         name=os.path.basename(path),
         sh=f"{editor} {shlex.quote(path)}",

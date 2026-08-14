@@ -38,7 +38,7 @@ from PyQt6.QtWidgets import (
 
 from . import APP_NAME, UI_POINT_SIZE
 from .dialogs import FolderNameDialog, ItemEditDialog
-from .launcher import launch
+from .launcher import TMUX_ATTACH, TMUX_CANCEL, TMUX_RESTART, launch
 from .menu import LAUNCH_TMUX, MenuNode, Options, dump_menu, load_menu
 from .utils import open_in_editor
 
@@ -174,6 +174,10 @@ class MenuTreeView(QTreeView):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.edit_mode = False  # off by default; never persisted across runs
+        # Set by MainWindow, which owns every dialog this GUI puts up; see
+        # launcher.launch's `on_running_session`. Left None (as it is in
+        # tests, or any other embedding) tmux mode just attaches, as before.
+        self.on_running_session = None
         self.setHeaderHidden(True)
         self.setRootIsDecorated(False)  # no expand arrows: levels never expand
         self.setItemsExpandable(False)
@@ -363,7 +367,7 @@ class MenuTreeView(QTreeView):
         if node.is_section:
             self.descend(index)
         else:
-            error = launch(node)
+            error = launch(node, on_running_session=self.on_running_session)
             if error:
                 self.launch_failed.emit(error)
 
@@ -420,6 +424,7 @@ class MainWindow(QWidget):
         )
 
         self.tree = MenuTreeView(self)
+        self.tree.on_running_session = self._ask_running_session
         self.tree.level_changed.connect(self._update_header)
         self.tree.launch_failed.connect(self._show_launch_error)
         self.tree.edit_requested.connect(self._handle_edit_icon)
@@ -492,6 +497,37 @@ class MainWindow(QWidget):
 
     def _show_launch_error(self, message: str) -> None:
         QMessageBox.critical(self, f"{APP_NAME} — launch failed", message)
+
+    def _ask_running_session(self, node: MenuNode, session: str, started: str | None) -> str:
+        """Attach to `node`'s already-running tmux session, or restart it?
+
+        Attaching is what this mode did unconditionally, and it stays the
+        default — but it means the script on disk is never read, so an edited
+        script appears to have no effect and the session quietly goes on
+        running the version it was started with. Saying when it started is the
+        point of the dialog: hours or days ago is the tell.
+        """
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle(f"{APP_NAME} — session already running")
+        box.setText(f"The tmux session '{session}' is already running.")
+        detail = f"Started {started}.\n\n" if started else ""
+        box.setInformativeText(
+            f"{detail}"
+            "Attach — reconnect to what's running now.\n"
+            f"Restart — end that session and run '{node.name}' again from scratch."
+        )
+        attach = box.addButton("Attach", QMessageBox.ButtonRole.AcceptRole)
+        restart = box.addButton("Restart", QMessageBox.ButtonRole.DestructiveRole)
+        box.addButton(QMessageBox.StandardButton.Cancel)
+        box.setDefaultButton(attach)  # the safe one: restarting kills a process
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is attach:
+            return TMUX_ATTACH
+        if clicked is restart:
+            return TMUX_RESTART
+        return TMUX_CANCEL  # includes closing the dialog outright
 
     def _handle_edit_icon(self, index: QModelIndex) -> None:
         """The row's edit icon was clicked: open the dialog for its kind."""

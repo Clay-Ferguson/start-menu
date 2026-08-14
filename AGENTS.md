@@ -33,7 +33,15 @@ with a required extra property (`tmux_session:`) and an external dependency.
   shell script that creates or reattaches to the session; its session-name
   and tmux-installed checks happen in Python first, so the failures that
   actually happen are dialogs rather than a terminal window that opens and
-  immediately dies.
+  immediately dies. The same reasoning puts `tmux_session_state()` in Python:
+  when the session is already live, `launch()` calls back through its
+  `on_running_session` hook to ask attach/restart/cancel, and only then
+  decides whether to open a window at all. The hook keeps the launcher free
+  of Qt — `window.py` supplies the actual dialog. Note that tmux's `=`
+  exact-match target prefix works for `has-session`, `list-panes`,
+  `kill-session` and `attach-session` but **not** for `set-option`,
+  `display-message` or `capture-pane`, which is why the wrapper mixes the two
+  forms.
 - `pycommander/window.py` — the GUI: `MainWindow` (header showing the
   current breadcrumb, the `MenuTreeView`, an **Edit** toggle switch + footer
   hint bar) and `MenuTreeView` itself, a `QTreeView`/`QStandardItemModel`

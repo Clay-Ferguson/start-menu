@@ -409,7 +409,15 @@ class ItemEditDialog(QDialog):
         path = self._file_edit.text().strip()
         if not path:
             return
+        # Resolved the same way menu.py's `resolved_file` does it, since what's
+        # in the field is usually a bare file name that "Pick File…" split off
+        # into `file:` + `cwd:` — on its own it names nothing on disk, and the
+        # editor would be pointed at a directory-less path.
         resolved = os.path.expanduser(os.path.expandvars(path))
+        if not os.path.isabs(resolved):
+            cwd = self._cwd_edit.text().strip()
+            if cwd:
+                resolved = os.path.join(os.path.expanduser(os.path.expandvars(cwd)), resolved)
         error = open_in_editor(resolved, self._editor)
         if error:
             QMessageBox.critical(self, "Cannot edit file", error)

@@ -248,18 +248,28 @@ What that looks like in practice:
 - **Close the window** — either by pressing `Ctrl+B` then `D`, or just closing
   it with the mouse. Both are safe: the command keeps running in the
   background.
-- **Launch the same item again later.** Instead of starting a second copy, it
-  reconnects you to the one already running, with all its earlier output still
-  scrolled back behind it.
+- **Launch the same item again later.** PyCommander notices the session is
+  still running and asks what you want:
+  - **Attach** — reconnect to the one already running, with all its earlier
+    output still scrolled back behind it. This is the default.
+  - **Restart** — stop that session and run the item again from scratch.
+  - **Cancel** — do nothing; no window opens.
+
+  The question includes **when the session was started**, which is worth
+  reading. Attaching does not re-run anything, so if you've edited the script
+  since that time, the running session is still the *old* version — restarting
+  is what picks up your changes. (Restart ends everything in that session, so
+  anything you've since started inside it goes too.)
 - **If the command has finished or crashed** in the meantime, launching starts
-  it fresh. Its last output is kept on screen rather than disappearing with
-  the window, so a command that fails immediately still leaves you something
-  to read.
+  it fresh without asking. Its last output is kept on screen rather than
+  disappearing with the window, so a command that fails immediately still
+  leaves you something to read.
 
 Each Tmux item needs a **session name** — this is what PyCommander uses to
 find the running session again next time. Give each item its own name unless
 you deliberately want two items to share one session; two items with the same
-name will connect to the same running command.
+name will connect to the same running command. The name has to match exactly,
+so an item named `web` will never pick up a session called `web-staging`.
 
 Session names allow letters, digits, `_` and `-` only. (tmux itself treats
 `:` and `.` as separators inside a session name, so allowing them would make

@@ -21,6 +21,8 @@ import re
 import shlex
 import shutil
 import subprocess
+import time
+from typing import Callable
 
 from .menu import LAUNCH_DETACHED, LAUNCH_HOLD, LAUNCH_TMUX, MenuNode
 
@@ -36,9 +38,39 @@ TMUX_SESSION_RE = re.compile(r"[A-Za-z0-9_-]+")
 # the one thing about this mode that isn't guessable.
 TMUX_DETACH_HINT = " Ctrl+B D = detach (process keeps running) "
 
+# What `tmux_session_state` found. "dead" means the session is still there but
+# every pane in it has exited — debris left behind by remain-on-exit, which the
+# generated wrapper clears on its own, so it needs no decision from the user.
+TMUX_ABSENT = "absent"
+TMUX_LIVE = "live"
+TMUX_DEAD = "dead"
 
-def launch(node: MenuNode) -> str | None:
-    """Run `node`'s script. Returns an error message, or None on success."""
+# What the caller's `on_running_session` hook may answer. ATTACH is what this
+# mode has always done on its own.
+TMUX_ATTACH = "attach"
+TMUX_RESTART = "restart"
+TMUX_CANCEL = "cancel"
+
+
+def launch(
+    node: MenuNode,
+    on_running_session: Callable[[MenuNode, str, str | None], str] | None = None,
+) -> str | None:
+    """Run `node`'s script. Returns an error message, or None on success.
+
+    `on_running_session` is consulted only in tmux mode, and only when the
+    item's session already exists with something still alive in it — the case
+    where "launch" would otherwise silently mean "reattach to what was started
+    the last time", never re-reading the script. It is called with
+    `(node, session_name, started)` — `started` being a human-readable local
+    time, or None if tmux wouldn't say — and answers TMUX_ATTACH (the historic
+    behavior), TMUX_RESTART (kill the session first, so the script runs again
+    from disk) or TMUX_CANCEL (do nothing at all). Left unset, this behaves
+    exactly as it did before: attach.
+
+    A cancelled launch returns None, same as a successful one: nothing ran,
+    but nothing went wrong either, and the caller has nothing to report.
+    """
     if node.is_section:
         return f"'{node.name}' is a section, not a script."
 
@@ -81,6 +113,17 @@ def launch(node: MenuNode) -> str | None:
                 f"Cannot launch '{node.name}':\n\n"
                 "tmux is not installed.\n\nInstall it with:  sudo apt install tmux"
             )
+        # Asked here rather than inside the generated script for the same
+        # reason as the checks above: from here it can be a dialog, and the
+        # answer decides whether a window is worth opening at all.
+        if on_running_session is not None and tmux_session_state(session) == TMUX_LIVE:
+            choice = on_running_session(node, session, tmux_session_started(session))
+            if choice == TMUX_CANCEL:
+                return None
+            if choice == TMUX_RESTART:
+                error = kill_tmux_session(session)
+                if error:
+                    return f"Cannot restart '{node.name}':\n\n{error}"
 
     cmd = build_command(node)
 
@@ -180,7 +223,8 @@ def _build_tmux_wrapper(node: MenuNode, inner: str) -> str:
     try to evaluate.
     """
     name = node.tmux_session.strip()
-    session = shlex.quote(name)
+    session = shlex.quote(name)  # for `-s`, which names a session rather than finds one
+    target = _tmux_target(name)
     # Two levels of quoting: the inner one makes the generated program a single
     # argument to `bash -lc`, the outer one makes the whole `bash -lc ...`
     # string a single argument to `tmux new-session`. `-lc` (a login shell)
@@ -236,13 +280,13 @@ def _build_tmux_wrapper(node: MenuNode, inner: str) -> str:
         # and `sort -u` collapses the result, so this reads as "every pane in
         # there is dead" — if the user has split off something that's still
         # alive, we reattach to it instead of killing their session.
-        "if tmux has-session -t " + session + " 2>/dev/null; then",
+        "if tmux has-session -t " + target + " 2>/dev/null; then",
         '  if [ "$(tmux list-panes -s -t %s -F \'#{pane_dead}\' 2>/dev/null'
-        ' | sort -u)" = "1" ]; then' % session,
-        "    tmux kill-session -t " + session + " 2>/dev/null",
+        ' | sort -u)" = "1" ]; then' % target,
+        "    tmux kill-session -t " + target + " 2>/dev/null",
         "  fi",
         "fi",
-        "if ! tmux has-session -t " + session + " 2>/dev/null; then",
+        "if ! tmux has-session -t " + target + " 2>/dev/null; then",
         # remain-on-exit must be set in this same tmux invocation, not a
         # following one: the likeliest real failure (a port already in use, say)
         # exits in milliseconds, and a second tmux process cannot win that race
@@ -251,14 +295,20 @@ def _build_tmux_wrapper(node: MenuNode, inner: str) -> str:
         #
         # -w because remain-on-exit is a window option (it lands on the window
         # just created); status-right is a session option, so it takes none.
+        #
+        # Plain `session`, not the exact `target` used everywhere else:
+        # set-option is one of the commands that does *not* accept the '='
+        # prefix (it reports "no such window", and the chain fails, leaving
+        # remain-on-exit unset). It needs no exactness anyway — new-session
+        # has just created this name, so tmux's own exact match finds it first.
         "  tmux new-session -d -s " + session + " " + shell_cmd
         + " \\; set-option -w -t " + session + " remain-on-exit on"
         + " \\; set-option -t " + session + " status-right " + hint,
         "fi",
-        "if ! tmux attach-session -t " + session + " 2>/dev/null; then",
+        "if ! tmux attach-session -t " + target + " 2>/dev/null; then",
         # Two very different failures, and naming the wrong one sends you
         # hunting a problem that isn't there.
-        "  if tmux has-session -t " + session + " 2>/dev/null; then",
+        "  if tmux has-session -t " + target + " 2>/dev/null; then",
         "    hold " + unattachable_msg,
         "  else",
         "    hold " + died_msg,
@@ -267,6 +317,99 @@ def _build_tmux_wrapper(node: MenuNode, inner: str) -> str:
         "fi",
     ]
     return "\n".join(lines)
+
+
+def tmux_session_state(name: str) -> str:
+    """Whether session `name` is absent, live, or dead debris.
+
+    Deliberately the same test the generated wrapper makes on itself (see
+    `_build_tmux_wrapper`): every pane in the session, across all its windows,
+    reporting `pane_dead` is what makes it debris. If the user has split off
+    something that's still running, the session counts as live and restarting
+    it would take that down too — which is exactly why the choice is theirs.
+
+    Any trouble running tmux at all reads as TMUX_ABSENT: this only decides
+    whether to *ask* a question, and the wrapper still does the real work, so
+    guessing "absent" costs at most an unasked question rather than an error
+    about something the user can't act on.
+    """
+    if shutil.which("tmux") is None:
+        return TMUX_ABSENT
+    target = "=" + name
+    if _tmux("has-session", "-t", target) is None:
+        return TMUX_ABSENT
+    panes = _tmux("list-panes", "-s", "-t", target, "-F", "#{pane_dead}")
+    if not panes:
+        return TMUX_ABSENT
+    return TMUX_DEAD if set(panes.split()) == {"1"} else TMUX_LIVE
+
+
+def tmux_session_started(name: str) -> str | None:
+    """When session `name` was created, as local time — or None if unknown.
+
+    Worth the extra call purely because of what it answers: a session started
+    days ago is running whatever the script said *then*, and the timestamp is
+    the quickest way to see that's what you're looking at.
+
+    Listed and matched here rather than asked for by target: `display-message`
+    reads its `-t` as a target *pane*, where the '=' exact-match prefix used
+    everywhere else silently resolves to nothing. Comparing names from
+    `list-sessions` is exact by construction, with no target syntax involved.
+    """
+    listing = _tmux("list-sessions", "-F", "#{session_created} #{session_name}")
+    if not listing:
+        return None
+    for line in listing.splitlines():
+        # Split once only: a session name may itself contain spaces.
+        created, _, session = line.partition(" ")
+        if session != name:
+            continue
+        try:
+            return time.strftime("%a %d %b %Y, %H:%M", time.localtime(int(created)))
+        except (ValueError, OSError):
+            return None
+    return None
+
+
+def kill_tmux_session(name: str) -> str | None:
+    """End session `name` and everything in it. Error message, or None."""
+    if _tmux("kill-session", "-t", "=" + name) is None:
+        return f"tmux could not end the session '{name}'."
+    # kill-session returns as soon as the server has dropped the session, so a
+    # launch that follows this reliably finds it gone and starts a fresh one.
+    return None
+
+
+def _tmux_target(name: str) -> str:
+    """Session `name` as a `-t` target, quoted for the generated shell script.
+
+    The '=' prefix is what makes tmux match the name *exactly*. Without it a
+    `-t` target falls back to prefix and pattern matching, so an item whose
+    session is 'llama' would find, attach to — and on a restart, kill — an
+    unrelated 'llama-deck' session that happened to be running. A session name
+    typed into the menu file is meant literally, never as a pattern.
+    """
+    return shlex.quote("=" + name)
+
+
+def _tmux(*args: str) -> str | None:
+    """Run a tmux command, returning its stdout — or None if it failed.
+
+    Short-lived queries against the local tmux server, so unlike the launched
+    scripts these are run and waited on. `_child_env` for the same reason the
+    scripts get it: PyCommander's own virtualenv has no business here.
+    """
+    try:
+        result = subprocess.run(
+            ["tmux", *args],
+            env=_child_env(),
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout if result.returncode == 0 else None
 
 
 def _terminal_argv(cmd: str, title: str) -> list[str] | None:
