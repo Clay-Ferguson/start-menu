@@ -49,10 +49,14 @@ with a required extra property (`tmux_session:`) and an external dependency.
   When **Edit** is on, a toolbar (**New Folder** / **New Item** buttons)
   appears and each row grows right-justified action icons (move up/down,
   edit, delete).
-- `pycommander/dialogs.py` — the two editing dialogs opened from those
-  action icons: `FolderNameDialog` (rename/create a section) and
-  `ItemEditDialog` (name, file-or-inline-`sh`, working directory, launch mode
-  and — shown only for `tmux` mode — the session name, for a script).
+- `pycommander/dialogs/` — the two editing dialogs opened from those action
+  icons, one per module: `folder_name.py` (`FolderNameDialog` — rename/create
+  a section) and `item_edit.py` (`ItemEditDialog` — name, file-or-inline-`sh`,
+  working directory, launch mode and — shown only for `tmux` mode — the
+  session name, for a script), over a shared `style.py` holding the bordered
+  frame and lightened-input styling both of them draw. The package's
+  `__init__.py` re-exports both classes, so `window.py` imports them from
+  `.dialogs` without naming a module.
 
 Every edit made through the GUI does a full save-and-reload round trip:
 write the in-memory tree to `menu.yaml`, then re-run it back through the

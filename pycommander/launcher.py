@@ -75,7 +75,7 @@ def launch(
         return f"'{node.name}' is a section, not a script."
 
     # Checked before `file:`, since a relative `file:` (e.g. a bare filename
-    # from "Pick File…" — see dialogs.py) only resolves against a valid `cwd:`.
+    # from "Pick File…" — see dialogs/) only resolves against a valid `cwd:`.
     cwd = node.resolved_cwd
     if not cwd:
         return (

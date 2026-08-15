@@ -2,7 +2,7 @@
 
 Currently just `open_in_editor`, shared by the "e" shortcut that opens the
 whole menu.yaml (window.py) and the "Edit" button on a script item's file
-path (dialogs.py).
+path (dialogs/item_edit.py).
 """
 
 from __future__ import annotations

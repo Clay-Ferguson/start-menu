@@ -1,11 +1,4 @@
-"""Editing dialogs opened from the tree's per-row action icons.
-
-One dialog class per editable thing: a folder's name (`FolderNameDialog`,
-shared between renaming an existing folder and naming a brand new one), and
-a launchable item's name/file-or-sh/cwd/launch mode (`ItemEditDialog`, same
-reuse between edit and create). Item reordering has no dialog of its own —
-it's driven straight from the row's up/down icons.
-"""
+"""The dialog for editing a launchable ('name:') entry."""
 
 from __future__ import annotations
 
@@ -13,14 +6,11 @@ import os
 
 from PyQt6.QtCore import QRegularExpression
 from PyQt6.QtGui import (
-    QColor,
     QFontDatabase,
     QFontMetrics,
-    QPalette,
     QRegularExpressionValidator,
 )
 from PyQt6.QtWidgets import (
-    QApplication,
     QButtonGroup,
     QComboBox,
     QDialog,
@@ -40,8 +30,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from . import UI_POINT_SIZE
-from .menu import (
+from .. import UI_POINT_SIZE
+from ..menu import (
     DEFAULT_LAUNCH,
     LAUNCH_DETACHED,
     LAUNCH_HOLD,
@@ -49,14 +39,8 @@ from .menu import (
     LAUNCH_TERMINAL,
     LAUNCH_TMUX,
 )
-from .utils import open_in_editor
-
-# A plain QDialog's outer edge is easy to lose against the desktop behind it,
-# so the real content sits inside a bordered QFrame instead — a QDialog won't
-# reliably paint a stylesheet border of its own, but a QFrame always will.
-BORDER_STYLE = "#dialogFrame { border: 1px solid #a0a0a0; border-radius: 6px; }"
-LABEL_STYLE = f"font-size: {UI_POINT_SIZE}pt;"
-BUTTON_STYLE = f"QPushButton {{ font-size: {UI_POINT_SIZE}pt; padding: 8px 20px; }}"
+from ..utils import open_in_editor
+from .style import BORDER_STYLE, BUTTON_STYLE, LABEL_STYLE, field_background, field_border, field_style
 
 # Friendly text for the launch-mode combobox; the underlying values (stored
 # as each item's data) are the same strings menu.py reads and writes.
@@ -81,95 +65,6 @@ SH_EDITOR_ROWS = 10
 # longest label ends up elided with "…" once the popup opens. This is added
 # on top of the longest label's measured width to give the popup room too.
 LAUNCH_COMBO_EXTRA_WIDTH = 150
-
-
-def _field_background() -> str:
-    """A background a shade lighter than the theme's default input color.
-
-    Computed from the live application palette (rather than a fixed hex)
-    so it lightens relative to whatever the desktop theme's own input
-    background is, instead of assuming a light or a dark theme. Queried
-    lazily — at dialog-build time, not import time — since no theme is
-    attached to the palette until QApplication exists.
-    """
-    base = QApplication.palette().color(QPalette.ColorRole.Base)
-    return base.lighter(130).name()
-
-
-def _field_border() -> str:
-    """A light-gray border, guaranteed lighter than the field's own
-    background so it actually reads as an outline instead of vanishing into
-    it. Setting any QSS on a widget (as `_field_background` does) opts it
-    out of the style's native border too, so this is drawn explicitly
-    rather than relying on a native on/off switch.
-    """
-    return QColor(_field_background()).lighter(140).name()
-
-
-def _field_style() -> str:
-    """Shared padding/font styling for single-line inputs and the combobox,
-    plus the lightened background and border from `_field_background` and
-    `_field_border`."""
-    return (
-        f"padding: 8px; font-size: {UI_POINT_SIZE}pt;"
-        f" background-color: {_field_background()}; border: 1px solid {_field_border()};"
-    )
-
-
-class FolderNameDialog(QDialog):
-    """A single text field for naming a section ('folder:') entry.
-
-    Reused for both renaming an existing folder and naming a new one — the
-    `title` decides which, since the field itself is identical either way.
-    """
-
-    def __init__(self, current_name: str, parent: QWidget | None = None, title: str = "Rename") -> None:
-        super().__init__(parent)
-        self.setWindowTitle(title)
-        self.setModal(True)
-        self.resize(440, 220)
-
-        self._name_edit = QLineEdit(current_name)
-        self._name_edit.setStyleSheet(_field_style())
-        self._name_edit.selectAll()
-
-        label = QLabel("Folder name:")
-        label.setStyleSheet(LABEL_STYLE)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.setStyleSheet(BUTTON_STYLE)
-        self._save_button = buttons.button(QDialogButtonBox.StandardButton.Save)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-
-        frame = QFrame(self)
-        frame.setObjectName("dialogFrame")
-        frame.setStyleSheet(BORDER_STYLE)
-
-        frame_layout = QVBoxLayout(frame)
-        frame_layout.setContentsMargins(24, 24, 24, 24)
-        frame_layout.setSpacing(14)
-        frame_layout.addWidget(label)
-        frame_layout.addWidget(self._name_edit)
-        frame_layout.addStretch(1)
-        frame_layout.addWidget(buttons)
-
-        outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(10, 10, 10, 10)
-        outer_layout.addWidget(frame)
-
-        self._name_edit.textChanged.connect(self._validate)
-        self._validate()
-        self._name_edit.setFocus()
-
-    def _validate(self) -> None:
-        # A blank name would leave the item unlabeled, so Save stays disabled.
-        self._save_button.setEnabled(bool(self._name_edit.text().strip()))
-
-    def new_name(self) -> str:
-        return self._name_edit.text().strip()
 
 
 class ItemEditDialog(QDialog):
@@ -205,7 +100,7 @@ class ItemEditDialog(QDialog):
         name_label = QLabel("Name:")
         name_label.setStyleSheet(LABEL_STYLE)
         self._name_edit = QLineEdit(name)
-        self._name_edit.setStyleSheet(_field_style())
+        self._name_edit.setStyleSheet(field_style())
 
         is_sh = sh is not None
         self._file_radio = QRadioButton("File")
@@ -224,7 +119,7 @@ class ItemEditDialog(QDialog):
         type_row.addStretch(1)
 
         self._file_edit = QLineEdit(file or "")
-        self._file_edit.setStyleSheet(_field_style())
+        self._file_edit.setStyleSheet(field_style())
         pick_button = QPushButton("Pick File…")
         pick_button.setStyleSheet(BUTTON_STYLE)
         pick_button.clicked.connect(self._pick_file)
@@ -255,7 +150,7 @@ class ItemEditDialog(QDialog):
         self._sh_edit = QPlainTextEdit(sh or "")
         self._sh_edit.setFont(mono_font)
         self._sh_edit.setStyleSheet(
-            f"background-color: {_field_background()}; border: 1px solid {_field_border()};"
+            f"background-color: {field_background()}; border: 1px solid {field_border()};"
         )
         self._sh_edit.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         metrics = QFontMetrics(mono_font)
@@ -285,7 +180,7 @@ class ItemEditDialog(QDialog):
         cwd_label = QLabel("Working directory:")
         cwd_label.setStyleSheet(LABEL_STYLE)
         self._cwd_edit = QLineEdit(cwd or "")
-        self._cwd_edit.setStyleSheet(_field_style())
+        self._cwd_edit.setStyleSheet(field_style())
         pick_cwd_button = QPushButton("Pick Folder…")
         pick_cwd_button.setStyleSheet(BUTTON_STYLE)
         pick_cwd_button.clicked.connect(self._pick_cwd)
@@ -297,7 +192,7 @@ class ItemEditDialog(QDialog):
         launch_label = QLabel("Launch:")
         launch_label.setStyleSheet(LABEL_STYLE)
         self._launch_combo = QComboBox()
-        self._launch_combo.setStyleSheet(_field_style())
+        self._launch_combo.setStyleSheet(field_style())
         for mode in LAUNCH_MODES:
             self._launch_combo.addItem(LAUNCH_LABELS[mode], mode)
         launch_index = self._launch_combo.findData(launch)
@@ -324,7 +219,7 @@ class ItemEditDialog(QDialog):
         self._tmux_label = QLabel("Tmux session name:")
         self._tmux_label.setStyleSheet(LABEL_STYLE)
         self._tmux_edit = QLineEdit(tmux_session or "")
-        self._tmux_edit.setStyleSheet(_field_style())
+        self._tmux_edit.setStyleSheet(field_style())
         self._tmux_edit.setValidator(
             QRegularExpressionValidator(QRegularExpression(TMUX_SESSION_PATTERN), self)
         )
