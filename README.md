@@ -61,6 +61,9 @@ of it anywhere you like.
 | `e` | Open `menu.yaml` itself in your editor |
 | `Esc` / `q` | Quit |
 
+The mouse works too: double-click a row to launch or open it, and click the
+back arrow in the header to go up a level.
+
 The window **stays open** after a launch, so you can fire off several things in
 a row. Launched scripts run in their own session and survive quitting.
 

@@ -40,9 +40,11 @@ all in one pass before trying again.
 
 The window has four parts, top to bottom:
 
-- **Header** — shows your current location as a breadcrumb (e.g.
-  `Applications / Browsers`) whenever you've navigated into a folder. At the
-  top level, where there's nothing to show, it disappears entirely.
+- **Header** — a back arrow (`←`) button plus your current location as a
+  breadcrumb (e.g. `Applications / Browsers`), shown whenever you've navigated
+  into a folder. Clicking the arrow backs up one level, the same as pressing
+  `←`. At the top level, where there's nothing to show and nowhere to back up
+  to, the whole header disappears.
 - **Edit toolbar** — two buttons, **New Folder** and **New Item**. Hidden
   unless edit mode is turned on (see [Edit Mode](#edit-mode)).
 - **The menu list** — the current folder's items, one per row, each with an
@@ -65,10 +67,12 @@ Navigation uses four keys, and nothing else is needed to use the menu:
 | `←` | Back up one level; the highlight lands on the folder you just came out of |
 | `⏎` (Enter) | Launch the highlighted item, or open the highlighted folder |
 
-Double-clicking a row with the mouse does the same thing Enter does.
+Double-clicking a row with the mouse does the same thing Enter does, and the
+back arrow in the header does the same thing `←` does — so the menu is fully
+usable with the mouse alone.
 
 At the very top level, pressing `←` does nothing — there's nowhere further
-back to go.
+back to go (and the header, with its back arrow, isn't shown there at all).
 
 ### Launching an Item
 

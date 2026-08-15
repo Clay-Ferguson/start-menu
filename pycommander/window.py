@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QStyle,
     QStyledItemDelegate,
+    QToolButton,
     QTreeView,
     QVBoxLayout,
     QWidget,
@@ -48,6 +49,8 @@ HINTS = "⏎ launch    e edit menu    q quit"
 
 MENU_POINT_SIZE = UI_POINT_SIZE  # local alias: this file spells it out a lot
 ICON_SIZE = 28
+BACK_ICON_SIZE = 20  # the header's "go up a level" arrow
+BACK_BUTTON_SIZE = 30  # the clickable square that arrow sits in
 ROW_PADDING = 10  # px above and below each row's text
 TOOLTIP_LINES = 12  # of an inline sh snippet, before the tooltip is truncated
 
@@ -85,6 +88,28 @@ def _edit_icon() -> QIcon:
     font.setPointSize(ACTION_ICON_SIZE - 8)
     painter.setFont(font)
     painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "✎")
+    painter.end()
+    return QIcon(pixmap)
+
+
+def _back_icon(style: QStyle) -> QIcon:
+    """A left-pointing arrow for the header's "go up a level" button."""
+    icon = QIcon.fromTheme("go-previous")
+    if not icon.isNull():
+        return icon
+    icon = style.standardIcon(QStyle.StandardPixmap.SP_ArrowBack)
+    if not icon.isNull():
+        return icon
+    # Same fallback reasoning as `_edit_icon`: draw the glyph ourselves rather
+    # than leave an invisible button.
+    pixmap = QPixmap(BACK_ICON_SIZE, BACK_ICON_SIZE)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    font = painter.font()
+    font.setPointSize(BACK_ICON_SIZE - 8)
+    painter.setFont(font)
+    painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "←")
     painter.end()
     return QIcon(pixmap)
 
@@ -418,10 +443,32 @@ class MainWindow(QWidget):
         self.setWindowTitle(APP_NAME)
         self.resize(560, 640)
 
+        # The header bar: a back arrow, then the breadcrumb. The arrow is the
+        # mouse-only equivalent of Left — the app is keyboard-first, but
+        # nothing on screen otherwise says how to get back out of a section
+        # you clicked your way into.
+        self.back_button = QToolButton()
+        self.back_button.setIcon(_back_icon(self.style()))
+        self.back_button.setIconSize(QSize(BACK_ICON_SIZE, BACK_ICON_SIZE))
+        self.back_button.setFixedSize(BACK_BUTTON_SIZE, BACK_BUTTON_SIZE)  # a comfortable target
+        self.back_button.setAutoRaise(True)  # flat until hovered
+        self.back_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.back_button.setToolTip("Go back (←)")
+        # Never take focus: clicking it must leave the arrow keys driving the
+        # tree, exactly as if Left had been pressed.
+        self.back_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.back_button.clicked.connect(self._go_back)
+
         self.header = QLabel()
-        self.header.setStyleSheet(
-            f"font-weight: bold; font-size: {MENU_POINT_SIZE + 1}pt; padding: 12px 14px;"
-        )
+        self.header.setStyleSheet(f"font-weight: bold; font-size: {MENU_POINT_SIZE + 1}pt;")
+
+        self.header_bar = QWidget()
+        header_layout = QHBoxLayout(self.header_bar)
+        header_layout.setContentsMargins(10, 10, 14, 10)
+        header_layout.setSpacing(8)
+        header_layout.addWidget(self.back_button)
+        header_layout.addWidget(self.header)
+        header_layout.addStretch(1)
 
         self.tree = MenuTreeView(self)
         self.tree.on_running_session = self._ask_running_session
@@ -470,7 +517,7 @@ class MainWindow(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        layout.addWidget(self.header)
+        layout.addWidget(self.header_bar)
         layout.addWidget(self.edit_toolbar)
         layout.addWidget(self.tree, 1)
         layout.addWidget(footer)
@@ -489,11 +536,17 @@ class MainWindow(QWidget):
 
         The app's name lives in the title bar; inside the window the header
         earns its space only once we've descended into a section, so at the
-        top level it disappears entirely rather than leaving a blank strip.
+        top level it disappears entirely rather than leaving a blank strip —
+        and with it the back arrow, which has nowhere to go from there.
         """
         crumbs = self.tree.breadcrumb()
         self.header.setText(" / ".join(crumbs))
-        self.header.setVisible(bool(crumbs))
+        self.header_bar.setVisible(bool(crumbs))
+
+    def _go_back(self) -> None:
+        """The header's back arrow: go up one level, as Left does."""
+        self.tree.ascend()
+        self.tree.setFocus()
 
     def _show_launch_error(self, message: str) -> None:
         QMessageBox.critical(self, f"{APP_NAME} — launch failed", message)

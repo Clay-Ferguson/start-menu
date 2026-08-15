@@ -42,8 +42,10 @@ with a required extra property (`tmux_session:`) and an external dependency.
   `kill-session` and `attach-session` but **not** for `set-option`,
   `display-message` or `capture-pane`, which is why the wrapper mixes the two
   forms.
-- `pycommander/window.py` — the GUI: `MainWindow` (header showing the
-  current breadcrumb, the `MenuTreeView`, an **Edit** toggle switch + footer
+- `pycommander/window.py` — the GUI: `MainWindow` (header showing a back
+  arrow button + the current breadcrumb — the whole bar hidden at the top
+  level, where there's nothing to show and nowhere to back up to — the
+  `MenuTreeView`, an **Edit** toggle switch + footer
   hint bar) and `MenuTreeView` itself, a `QTreeView`/`QStandardItemModel`
   that shows one level at a time via `setRootIndex()` rather than expanding.
   When **Edit** is on, a toolbar (**New Folder** / **New Item** buttons)
