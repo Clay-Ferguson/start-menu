@@ -48,9 +48,18 @@ with a required extra property (`tmux_session:`) and an external dependency.
   `MenuTreeView`, an **Edit** toggle switch + footer
   hint bar) and `MenuTreeView` itself, a `QTreeView`/`QStandardItemModel`
   that shows one level at a time via `setRootIndex()` rather than expanding.
-  When **Edit** is on, a toolbar (**New Folder** / **New Item** buttons)
-  appears and each row grows right-justified action icons (move up/down,
-  edit, delete).
+  When **Edit** is on, a toolbar appears (**New Folder** / **New Item**, plus
+  **Cut** / **Undo Cut** / **Paste**, each shown only when it applies), rows
+  become multi-selectable, and each row grows right-justified action icons
+  (move up/down, edit, delete). Cut/paste moves *items* between folders —
+  folders themselves are deliberately not cuttable, which is why
+  `_handle_cut` rejects a selection containing one instead of silently
+  skipping it. A cut writes nothing: the nodes stay in the tree and their
+  rows are merely hidden (`setRowHidden`, not left out of the model, so the
+  row-number ↔ `MenuNode` mapping the other edit paths rely on still holds),
+  and the move only becomes real on **Paste**. Because a save-and-reload
+  builds all-new `MenuNode` objects, any *other* edit while a cut is pending
+  drops the cut — nothing is lost, since the items were never removed.
 - `pycommander/dialogs/` — the two editing dialogs opened from those action
   icons, one per module: `folder_name.py` (`FolderNameDialog` — rename/create
   a section) and `item_edit.py` (`ItemEditDialog` — name, file-or-inline-`sh`,

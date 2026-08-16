@@ -45,8 +45,9 @@ The window has four parts, top to bottom:
   into a folder. Clicking the arrow backs up one level, the same as pressing
   `←`. At the top level, where there's nothing to show and nowhere to back up
   to, the whole header disappears.
-- **Edit toolbar** — two buttons, **New Folder** and **New Item**. Hidden
-  unless edit mode is turned on (see [Edit Mode](#edit-mode)).
+- **Edit toolbar** — **New Folder** and **New Item**, plus **Cut**, **Undo
+  Cut** and **Paste** whenever those apply. Hidden unless edit mode is turned
+  on (see [Edit Mode](#edit-mode)).
 - **The menu list** — the current folder's items, one per row, each with an
   icon and a label.
 - **Footer** — the edit mode toggle switch, and a row of key hints
@@ -108,14 +109,20 @@ modify anything — add, rename, reorder, or remove folders and items — turn o
 **Edit mode** using the switch in the bottom-left corner of the window (next
 to the "Edit" label).
 
-Turning edit mode on does two things:
+Turning edit mode on does three things:
 
-1. The **New Folder** and **New Item** buttons appear in the toolbar just
-   below the header.
+1. The editing buttons appear in the toolbar just below the header: **New
+   Folder** and **New Item** always, and **Cut**, **Undo Cut** and **Paste**
+   whenever they apply (see [Moving Items Between
+   Folders](#moving-items-between-folders)).
 2. The currently highlighted row grows a set of small action icons on its
    right edge: **move up**, **move down**, **edit**, and **delete** (in that
    order, right to left). These icons only ever appear on the highlighted
    row — move the highlight with the arrow keys and they follow it.
+3. You can select more than one row at a time — hold **Ctrl** and click to
+   add or remove individual rows, or hold **Shift** and click to select a
+   run of them. This is only useful for **Cut**; turning edit mode back off
+   collapses the selection to a single row again.
 
 Edit mode is **not remembered** between runs — every time you start
 PyCommander, it opens with edit mode off, so you don't accidentally leave the
@@ -306,16 +313,53 @@ allowed to end up empty.
 ### Reordering Items
 
 Use a row's ↑ and ↓ action icons to move it earlier or later within its
-current level. Items can only be reordered within the level they're in —
-there's no drag-and-drop, and moving an item into a different folder isn't
-supported directly (edit the item to point somewhere else, or edit the menu
-file by hand for that kind of restructuring).
+current level. There's no drag-and-drop; to move something into a *different*
+folder, cut and paste it (below).
+
+### Moving Items Between Folders
+
+Cut and paste moves launchable items from one folder to another. It works on
+several items at once, and only in edit mode.
+
+1. Select what you want to move: click one row, or Ctrl-click / Shift-click
+   to select several. **Cut** appears in the toolbar as soon as at least one
+   launchable item is selected.
+2. Click **Cut**. The selected rows disappear from the list — that's how you
+   can tell what's waiting to be moved. Nothing has actually changed yet:
+   the menu file on disk is untouched, and the items are simply hidden until
+   they land somewhere.
+3. Navigate to wherever you want them (`→` into folders, `←` back out, as
+   usual), then click **Paste**. The items are added to the **end** of
+   whichever level you're looking at, and the menu file is written out
+   immediately.
+
+While items are waiting to be pasted, the **Cut** button is replaced by
+**Undo Cut** and **Paste**. **Undo Cut** simply brings the hidden rows back
+where they were — since a cut never moved anything, there's nothing else to
+undo.
+
+A few things worth knowing:
+
+- **Folders can't be cut.** Only launchable items can be moved this way. If
+  your selection includes a folder, PyCommander says so and does nothing —
+  deselect the folder and click **Cut** again. (To restructure folders
+  themselves, [edit the menu file directly](#opening-the-menu-file-directly).)
+- **Cut replaces the previous cut.** Whatever is selected when you click
+  **Cut** becomes the whole set of items waiting to be pasted; you can't walk
+  around the menu cutting a few items here and a few there and expect them to
+  pile up.
+- **Any other edit cancels a pending cut.** Creating, renaming, deleting, or
+  reordering something while items are waiting to be pasted brings those
+  items back into view instead. Nothing is lost — they never left the menu.
+  Turning edit mode off does the same.
+- Pasting into the same folder you cut from is allowed; it just moves those
+  items to the end of that folder.
 
 ## Opening the Menu File Directly
 
 Press `e` at any time (edit mode doesn't need to be on) to open the menu file
 itself in a text editor — useful for changes the GUI doesn't offer directly,
-like reordering into a different folder, or bulk edits across many items.
+like moving a whole folder somewhere else, or bulk edits across many items.
 
 Which editor opens is controlled by the menu file's `options.editor` setting
 (see below); if that isn't set, PyCommander falls back to the `$VISUAL` or
@@ -341,8 +385,8 @@ directly (see below).
 
 Everything above is driven by a single YAML file — the one you pointed
 `start.sh` at. You don't need to hand-edit this file to use PyCommander; the
-Edit-mode tools cover creating, renaming, reordering, and deleting folders
-and items. This section is a reference for anyone who wants to edit the file
+Edit-mode tools cover creating, renaming, reordering, moving, and deleting
+folders and items. This section is a reference for anyone who wants to edit the file
 directly (via `e`), or understand what the GUI is actually writing.
 
 ### Structure

@@ -182,6 +182,7 @@ class MenuTreeView(QTreeView):
     """One-level-at-a-time tree driven entirely by the arrow keys."""
 
     level_changed = pyqtSignal()
+    selection_changed = pyqtSignal()
     launch_failed = pyqtSignal(str)
     edit_requested = pyqtSignal(QModelIndex)
     delete_requested = pyqtSignal(QModelIndex)
@@ -199,6 +200,7 @@ class MenuTreeView(QTreeView):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.edit_mode = False  # off by default; never persisted across runs
+        self._hidden_ids: set[int] = set()  # id()s of the nodes a pending cut hides
         # Set by MainWindow, which owns every dialog this GUI puts up; see
         # launcher.launch's `on_running_session`. Left None (as it is in
         # tests, or any other embedding) tmux mode just attaches, as before.
@@ -240,7 +242,23 @@ class MenuTreeView(QTreeView):
         )
 
     def set_edit_mode(self, enabled: bool) -> None:
+        """Turn the per-row action icons — and multi-selection — on or off.
+
+        Multi-selection exists only to feed Cut, so it's confined to edit
+        mode; leaving it, the highlight collapses back to the single current
+        row, the way it behaves everywhere else in the app.
+        """
         self.edit_mode = enabled
+        self.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection
+            if enabled
+            else QAbstractItemView.SelectionMode.SingleSelection
+        )
+        if not enabled:
+            current = self.currentIndex()
+            self.clearSelection()
+            if current.isValid():
+                self.setCurrentIndex(current)
         self.setStyleSheet(self._stylesheet())
         self.viewport().update()
 
@@ -249,22 +267,32 @@ class MenuTreeView(QTreeView):
     def set_nodes(
         self,
         nodes: list[MenuNode],
-        restore_path: list[int] | None = None,
+        restore_path: list[str] | None = None,
         select_name: str | None = None,
     ) -> None:
         """Build the model from the menu tree.
 
         With no `restore_path`, this is a fresh load: show the top level.
-        With one — as after an edit that rewrote the file and reloaded it —
-        descend back to the same folder instead of landing back at the top,
-        and highlight `select_name` there instead of always the first row —
-        a move only reorders rows, so the item that was highlighted (which
-        may not even be the one that moved) needs to be found by name, not
-        by the row position it used to be at.
+        With one — the folder names from `breadcrumb()`, as after an edit that
+        rewrote the file and reloaded it — descend back to the same folder
+        instead of landing back at the top, and highlight `select_name` there
+        instead of always the first row. Both are names rather than row
+        numbers because an edit can renumber the rows underneath them: a move
+        reorders a level, and a paste empties rows out of the level it cut
+        from, which would shift the folder we're standing in.
         """
         model = QStandardItemModel(self)
         self._populate(model.invisibleRootItem(), nodes)
         self.setModel(model)
+        # A rebuild replaces every MenuNode object, so a pending cut can't
+        # outlive it (MainWindow drops the cut before getting here); start the
+        # new model with nothing hidden.
+        self._hidden_ids = set()
+        # setModel installs a brand new selection model, so this connection has
+        # to be remade every time rather than once in __init__.
+        self.selectionModel().selectionChanged.connect(
+            lambda *_: self.selection_changed.emit()
+        )
         if restore_path is not None:
             self._restore_path(restore_path, select_name)
         else:
@@ -275,9 +303,11 @@ class MenuTreeView(QTreeView):
     def current_path(self) -> list[int]:
         """Row numbers from the top level down to the current folder.
 
-        The inverse of `_restore_path`: capture this before an edit rebuilds
-        the model, then hand it back to `set_nodes` to return to the same
-        place.
+        The same walk `breadcrumb()` does, in row numbers instead of names,
+        for callers that need to find the matching MenuNode list (see
+        `MainWindow._current_level_nodes`). Only valid until the tree is
+        mutated; to *return* to this folder after a rebuild, use the names
+        from `breadcrumb()` instead.
         """
         rows: list[int] = []
         index = self.rootIndex()
@@ -291,25 +321,78 @@ class MenuTreeView(QTreeView):
         node = self.node_at(self.currentIndex())
         return node.name if node is not None else None
 
-    def _restore_path(self, path: list[int], select_name: str | None) -> None:
+    def _restore_path(self, path: list[str], select_name: str | None) -> None:
         index = QModelIndex()
-        for row in path:
-            child = self.model().index(row, 0, index)
-            if not child.isValid():
+        for name in path:
+            child = self._child_named(index, name)
+            if child is None:
                 break  # the path no longer exists; land as deep as it goes
             index = child
         self.setRootIndex(index)
         self._select_by_name(select_name)
         self.level_changed.emit()
 
+    def _child_named(self, parent: QModelIndex, name: str) -> QModelIndex | None:
+        """`parent`'s first visible child row labelled `name`, if any."""
+        for row in range(self.model().rowCount(parent)):
+            if self.isRowHidden(row, parent):
+                continue
+            child = self.model().index(row, 0, parent)
+            if child.data(Qt.ItemDataRole.DisplayRole) == name:
+                return child
+        return None
+
     def _select_by_name(self, name: str | None) -> None:
         if name is not None:
-            for row in range(self.model().rowCount(self.rootIndex())):
-                candidate = self.model().index(row, 0, self.rootIndex())
-                if candidate.data(Qt.ItemDataRole.DisplayRole) == name:
-                    self.setCurrentIndex(candidate)
-                    return
+            child = self._child_named(self.rootIndex(), name)
+            if child is not None:
+                self.clearSelection()
+                self.setCurrentIndex(child)
+                return
         self._select_first()  # no name given, or it's no longer in this level
+
+    # -- cut/paste -----------------------------------------------------------
+
+    def set_hidden_nodes(self, nodes: list[MenuNode]) -> None:
+        """Hide the rows of `nodes` — the items waiting to be pasted.
+
+        The rows are hidden with `setRowHidden` rather than left out of the
+        model, because every edit path here maps a view row back to a MenuNode
+        by row number (see `MainWindow._current_level_nodes`): the model has to
+        keep the same shape as the tree even while some of its rows aren't on
+        screen. Nothing is written to disk by a cut, so this hiding *is* the
+        only feedback the user gets that the items are on their way somewhere.
+        """
+        self._hidden_ids = {id(node) for node in nodes}
+        self._apply_hidden(QModelIndex())
+        current = self.currentIndex()
+        if not current.isValid() or self.isRowHidden(current.row(), current.parent()):
+            self._select_first()  # the highlighted row was one of the cut ones
+
+    def _apply_hidden(self, parent: QModelIndex) -> None:
+        """Sync every row's hidden state under `parent` with `_hidden_ids`."""
+        model = self.model()
+        for row in range(model.rowCount(parent)):
+            index = model.index(row, 0, parent)
+            node = self.node_at(index)
+            self.setRowHidden(row, parent, node is not None and id(node) in self._hidden_ids)
+            self._apply_hidden(index)
+
+    def selected_nodes(self) -> list[MenuNode]:
+        """The nodes selected in the level currently on screen, in row order.
+
+        Selecting rows and then navigating elsewhere would otherwise leave a
+        selection hanging on another level; only this level's rows count.
+        """
+        model = self.selectionModel()
+        if model is None:
+            return []
+        root = self.rootIndex()
+        rows = sorted(
+            (index for index in model.selectedRows() if index.parent() == root),
+            key=lambda index: index.row(),
+        )
+        return [node for index in rows if (node := self.node_at(index)) is not None]
 
     def visible_action_slots(self, index: QModelIndex) -> dict[int, str]:
         """Which action icons apply to `index`'s row, and each one's slot.
@@ -366,9 +449,13 @@ class MenuTreeView(QTreeView):
         return names
 
     def _select_first(self) -> None:
-        first = self.model().index(0, 0, self.rootIndex())
-        if first.isValid():
-            self.setCurrentIndex(first)
+        """Highlight this level's first row that a pending cut isn't hiding."""
+        self.clearSelection()
+        root = self.rootIndex()
+        for row in range(self.model().rowCount(root)):
+            if not self.isRowHidden(row, root):
+                self.setCurrentIndex(self.model().index(row, 0, root))
+                return
 
     def descend(self, index: QModelIndex) -> None:
         self.setRootIndex(index)
@@ -380,7 +467,9 @@ class MenuTreeView(QTreeView):
         if not came_from.isValid():
             return  # already at the top level; Left does nothing, as in Commander
         self.setRootIndex(came_from.parent())
-        # Land the highlight back on the section we just stepped out of.
+        # Land the highlight back on the section we just stepped out of, and
+        # drop whatever was multi-selected on the level we're leaving.
+        self.clearSelection()
         self.setCurrentIndex(came_from)
         self.level_changed.emit()
 
@@ -479,24 +568,37 @@ class MainWindow(QWidget):
         self.tree.move_up_requested.connect(lambda index: self._handle_move(index, -1))
         self.tree.move_down_requested.connect(lambda index: self._handle_move(index, 1))
 
+        # Items the user has cut and not yet pasted. Held in memory only: a cut
+        # writes nothing to disk, it just hides the rows until they land
+        # somewhere (see `_handle_cut`).
+        self.cut_nodes: list[MenuNode] = []
+
         self.edit_toolbar = QWidget()
         edit_toolbar_layout = QHBoxLayout(self.edit_toolbar)
         edit_toolbar_layout.setContentsMargins(14, 8, 14, 8)
         edit_toolbar_layout.setSpacing(8)
-        new_folder_button = QPushButton("New Folder")
-        new_folder_button.setStyleSheet(f"font-size: {MENU_POINT_SIZE - 3}pt; padding: 4px 12px;")
-        new_folder_button.clicked.connect(self._handle_new_folder)
-        new_item_button = QPushButton("New Item")
-        new_item_button.setStyleSheet(f"font-size: {MENU_POINT_SIZE - 3}pt; padding: 4px 12px;")
-        new_item_button.clicked.connect(self._handle_new_item)
-        edit_toolbar_layout.addWidget(new_folder_button)
-        edit_toolbar_layout.addWidget(new_item_button)
+        # Cut/Undo Cut/Paste are shown only when they apply, so the toolbar
+        # says what's actually possible right now; `_update_edit_buttons`
+        # decides. New Folder/New Item always apply.
+        self.cut_button = self._toolbar_button("Cut", self._handle_cut)
+        self.undo_cut_button = self._toolbar_button("Undo Cut", self._handle_undo_cut)
+        self.paste_button = self._toolbar_button("Paste", self._handle_paste)
+        for button in (
+            self._toolbar_button("New Folder", self._handle_new_folder),
+            self._toolbar_button("New Item", self._handle_new_item),
+            self.cut_button,
+            self.undo_cut_button,
+            self.paste_button,
+        ):
+            edit_toolbar_layout.addWidget(button)
         edit_toolbar_layout.addStretch(1)
         self.edit_toolbar.setVisible(False)  # only shown while edit mode is on
 
+        self.tree.level_changed.connect(self._update_edit_buttons)
+        self.tree.selection_changed.connect(self._update_edit_buttons)
+
         self.edit_toggle = ToggleSwitch(self)
-        self.edit_toggle.toggled.connect(self.tree.set_edit_mode)
-        self.edit_toggle.toggled.connect(self.edit_toolbar.setVisible)
+        self.edit_toggle.toggled.connect(self._handle_edit_toggled)
 
         edit_label = QLabel("Edit")
         edit_label.setStyleSheet(f"font-size: {MENU_POINT_SIZE - 3}pt;")
@@ -530,6 +632,41 @@ class MainWindow(QWidget):
 
         self.tree.set_nodes(nodes)
         self.tree.setFocus()
+
+    def _toolbar_button(self, text: str, slot) -> QPushButton:
+        """One button of the edit toolbar, all styled alike."""
+        button = QPushButton(text)
+        button.setStyleSheet(f"font-size: {MENU_POINT_SIZE - 3}pt; padding: 4px 12px;")
+        button.clicked.connect(slot)
+        return button
+
+    def _handle_edit_toggled(self, enabled: bool) -> None:
+        """The Edit switch was flipped: show or hide everything editing needs.
+
+        Leaving edit mode abandons a pending cut rather than leaving items
+        hidden with no visible way to bring them back — nothing is lost, since
+        a cut never removed them from the menu file in the first place.
+        """
+        self.tree.set_edit_mode(enabled)
+        self.edit_toolbar.setVisible(enabled)
+        if not enabled:
+            self._clear_cut()
+        self._update_edit_buttons()
+
+    def _update_edit_buttons(self) -> None:
+        """Show only the toolbar buttons that apply to the current state.
+
+        Cut and Paste are the two halves of one operation and are never
+        offered at the same time: Cut until something has been cut, then Undo
+        Cut and Paste until those items land somewhere.
+        """
+        pending = bool(self.cut_nodes)
+        self.undo_cut_button.setVisible(pending)
+        self.paste_button.setVisible(pending)
+        # Folders can't be cut, so a level's folders alone are not something
+        # to offer Cut for.
+        cuttable = any(not node.is_section for node in self.tree.selected_nodes())
+        self.cut_button.setVisible(not pending and cuttable)
 
     def _update_header(self) -> None:
         """Show where we are, or nothing at all at the top level.
@@ -687,6 +824,65 @@ class MainWindow(QWidget):
         )
         self._save_and_reload(select_name=name)
 
+    def _handle_cut(self) -> None:
+        """The toolbar's "Cut" button was clicked.
+
+        Whatever is selected *right now* becomes the cut set, replacing any
+        earlier one — cutting is a reset, not something that accumulates as
+        the user walks around the tree. Nothing is written to disk and nothing
+        leaves the in-memory tree yet; the items are only hidden, so a cut
+        that's never pasted costs nothing.
+        """
+        selected = self.tree.selected_nodes()
+        folders = [node for node in selected if node.is_section]
+        if folders:
+            names = ", ".join(f'"{node.name}"' for node in folders)
+            QMessageBox.warning(
+                self,
+                f"{APP_NAME} — cannot cut",
+                f"Folders can't be cut and pasted — only items can.\n\n"
+                f"Deselect {names} and try again.",
+            )
+            return
+        if not selected:
+            return
+        self.cut_nodes = selected
+        self.tree.set_hidden_nodes(self.cut_nodes)
+        self._update_edit_buttons()
+
+    def _handle_undo_cut(self) -> None:
+        """The toolbar's "Undo Cut" button was clicked: unhide the cut items.
+
+        There is nothing else to undo — the cut items never moved.
+        """
+        self._clear_cut()
+        self._update_edit_buttons()
+
+    def _handle_paste(self) -> None:
+        """The toolbar's "Paste" button was clicked.
+
+        The cut items are appended to whichever level is currently on screen —
+        the same placement rule New Folder/New Item use — and *this* is the
+        step that makes the move permanent, since it's the first one to write
+        the file.
+        """
+        if not self.cut_nodes:
+            return
+        pasted = self.cut_nodes
+        target = self._current_level_nodes()
+        for node in pasted:
+            _detach_node(self.nodes, node)  # remove from wherever it was cut from
+        target.extend(pasted)  # `target` survives the removals: same list object
+        self._clear_cut()
+        self._save_and_reload(select_name=pasted[0].name)
+
+    def _clear_cut(self) -> None:
+        """Forget any pending cut and put its rows back on screen."""
+        if not self.cut_nodes:
+            return
+        self.cut_nodes = []
+        self.tree.set_hidden_nodes([])
+
     def _current_level_nodes(self) -> list[MenuNode]:
         """The MenuNode list for the level currently shown in the tree.
 
@@ -736,8 +932,14 @@ class MainWindow(QWidget):
         so is the highlighted row — `select_name`, when given, picks out a
         row that wasn't already highlighted (e.g. one just created); left
         unset, whatever was highlighted before stays highlighted.
+
+        A pending cut can't survive this: the reload replaces every MenuNode
+        object, so the cut list would be pointing at nodes that are no longer
+        in the tree. It's dropped instead — the cut items reappear where they
+        were, which is where they still are on disk.
         """
-        path = self.tree.current_path()
+        self._clear_cut()
+        path = self.tree.breadcrumb()
         if select_name is None:
             select_name = self.tree.current_selection_name()
         try:
@@ -767,6 +969,22 @@ class MainWindow(QWidget):
         error = open_in_editor(self.menu_path, self.options.resolved_editor())
         if error:
             QMessageBox.critical(self, f"{APP_NAME} — cannot edit menu", error)
+
+
+def _detach_node(nodes: list[MenuNode], target: MenuNode) -> bool:
+    """Remove `target` from `nodes` or any section under it. True if found.
+
+    Identity, not equality: MenuNode is a dataclass, so two items that happen
+    to carry the same fields compare equal and `list.remove` would drop the
+    wrong one.
+    """
+    for i, node in enumerate(nodes):
+        if node is target:
+            del nodes[i]
+            return True
+        if node.is_section and _detach_node(node.children, target):
+            return True
+    return False
 
 
 def _tooltip(node: MenuNode) -> str:
