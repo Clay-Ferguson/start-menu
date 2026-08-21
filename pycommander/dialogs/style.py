@@ -34,13 +34,29 @@ def field_background() -> str:
 
 
 def field_border() -> str:
-    """A light-gray border, guaranteed lighter than the field's own
-    background so it actually reads as an outline instead of vanishing into
-    it. Setting any QSS on a widget (as `field_background` does) opts it
-    out of the style's native border too, so this is drawn explicitly
-    rather than relying on a native on/off switch.
+    """A border that contrasts with the field's own background, whichever
+    direction that has to go. Setting any QSS on a widget (as
+    `field_background` does) opts it out of the style's native border too,
+    so this is drawn explicitly rather than relying on a native on/off
+    switch.
+
+    Lightening is tried first, to stay of a piece with the lightened
+    background — but both `lighter()` and `darker()` work in HSV, by scaling
+    the value component, so each is a no-op at the end of the scale it is
+    heading toward. On a light theme the palette's Base is already white and
+    lightening hands back white, leaving an outline indistinguishable from
+    the field it is meant to outline; darkening covers that case. On a pure
+    black Base (some high-contrast and OLED themes) the value component is
+    zero and *neither* direction moves, so the last resort is a fixed gray.
     """
-    return QColor(field_background()).lighter(140).name()
+    background = QColor(field_background())
+    lightened = background.lighter(140)
+    if lightened != background:
+        return lightened.name()
+    darkened = background.darker(115)
+    if darkened != background:
+        return darkened.name()
+    return "#2e2e2e"
 
 
 def field_style() -> str:
