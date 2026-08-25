@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Start Menu
+Comment=Launch scripts via an arrow-key menu
+Exec=/home/clay/ferguson/projects/start-menu/start.sh
+Icon=/home/clay/ferguson/projects/start-menu/start-menu.png
+Terminal=false
+Type=Application
+Categories=Utility;
+StartupWMClass=start-menu

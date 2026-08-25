@@ -1,11 +1,11 @@
-# PyCommander User Guide
+# Start Menu User Guide
 
-## What PyCommander Is
+## What Start Menu Is
 
-PyCommander is a small, keyboard-driven menu application for launching your own
+Start Menu is a small, keyboard-driven menu application for launching your own
 scripts and commands. Instead of hunting through folders or remembering
 command lines, you define a menu of items — organized into folders if you
-like — and PyCommander shows it to you as a simple, navigable list. Pick an
+like — and Start Menu shows it to you as a simple, navigable list. Pick an
 item, press Enter, and it runs.
 
 The whole menu lives in a single window that shows **one level at a time**.
@@ -19,20 +19,20 @@ that menu — adding, renaming, reordering, and removing folders and items —
 directly from within the app, or by opening the underlying file in a text
 editor. Both ways are covered below.
 
-## Starting PyCommander
+## Running Start Menu
 
-PyCommander is started with the path to a menu file:
+Start Menu is started with the path to a menu file:
 
 ```bash
 ./start.sh /path/to/menu.yaml
 ```
 
-If the file you point it at doesn't exist yet, PyCommander creates it
+If the file you point it at doesn't exist yet, Start Menu creates it
 automatically with a small starter item, so pointing it at a brand-new path
 just works — you'll have something to look at and edit immediately.
 
 If the menu file exists but has a problem (invalid YAML, or a menu entry
-that's missing something it needs), PyCommander won't open a broken window —
+that's missing something it needs), Start Menu won't open a broken window —
 instead it shows a dialog listing every problem found, so you can fix them
 all in one pass before trying again.
 
@@ -78,9 +78,9 @@ back to go (and the header, with its back arrow, isn't shown there at all).
 ### Launching an Item
 
 Pressing Enter (or double-clicking) on a launchable item runs it immediately.
-The PyCommander window **stays open** afterward, so you can fire off several
+The Start Menu window **stays open** afterward, so you can fire off several
 things in a row without reopening the app. Whatever you launch runs
-independently of PyCommander — closing the menu window doesn't stop anything
+independently of Start Menu — closing the menu window doesn't stop anything
 you've started.
 
 If something goes wrong while launching (a missing script file, a missing
@@ -104,7 +104,7 @@ Press `Esc` or `q` at any time to close the window.
 
 ## Edit Mode
 
-By default, PyCommander opens ready to *use* the menu, not change it. To
+By default, Start Menu opens ready to *use* the menu, not change it. To
 modify anything — add, rename, reorder, or remove folders and items — turn on
 **Edit mode** using the switch in the bottom-left corner of the window (next
 to the "Edit" label).
@@ -125,14 +125,14 @@ Turning edit mode on does three things:
    collapses the selection to a single row again.
 
 Edit mode is **not remembered** between runs — every time you start
-PyCommander, it opens with edit mode off, so you don't accidentally leave the
+Start Menu, it opens with edit mode off, so you don't accidentally leave the
 menu editable.
 
 Every change you make — creating, editing, deleting, or reordering an item —
 is saved to the menu file immediately and automatically. There's no separate
 "Save" step and no undo; each action asks for confirmation first when it's
 destructive (see [Deleting an Item](#deleting-an-item)), and takes effect as
-soon as you confirm it. After saving, PyCommander reloads the file from disk
+soon as you confirm it. After saving, Start Menu reloads the file from disk
 and returns you to the same folder you were in, with the same item
 highlighted where possible.
 
@@ -259,7 +259,7 @@ What that looks like in practice:
 - **Close the window** — either by pressing `Ctrl+B` then `D`, or just closing
   it with the mouse. Both are safe: the command keeps running in the
   background.
-- **Launch the same item again later.** PyCommander notices the session is
+- **Launch the same item again later.** Start Menu notices the session is
   still running and asks what you want:
   - **Attach** — reconnect to the one already running, with all its earlier
     output still scrolled back behind it. This is the default.
@@ -276,7 +276,7 @@ What that looks like in practice:
   disappearing with the window, so a command that fails immediately still
   leaves you something to read.
 
-Each Tmux item needs a **session name** — this is what PyCommander uses to
+Each Tmux item needs a **session name** — this is what Start Menu uses to
 find the running session again next time. Give each item its own name unless
 you deliberately want two items to share one session; two items with the same
 name will connect to the same running command. The name has to match exactly,
@@ -284,14 +284,14 @@ so an item named `web` will never pick up a session called `web-staging`.
 
 Session names allow letters, digits, `_` and `-` only. (tmux itself treats
 `:` and `.` as separators inside a session name, so allowing them would make
-PyCommander connect to the wrong thing.) The item editor's field simply won't
+Start Menu connect to the wrong thing.) The item editor's field simply won't
 accept other characters.
 
 This mode requires the `tmux` program to be installed. On Ubuntu or Debian:
 `sudo apt install tmux`. Like a missing script file or working directory, a
 missing `tmux`, a missing session name, or one containing illegal characters
 (possible only if the menu file was hand-edited) isn't reported when
-PyCommander starts — you get a dialog explaining it at the moment you try to
+Start Menu starts — you get a dialog explaining it at the moment you try to
 launch the item.
 
 A session started this way is also reachable from any ordinary terminal with
@@ -307,7 +307,7 @@ deletes everything inside it too.
 
 The one restriction: the top-level menu can never be left completely empty.
 If you try to delete the last remaining item at the very top level,
-PyCommander refuses and explains why. A folder, unlike the top level, is
+Start Menu refuses and explains why. A folder, unlike the top level, is
 allowed to end up empty.
 
 ### Reordering Items
@@ -341,7 +341,7 @@ undo.
 A few things worth knowing:
 
 - **Folders can't be cut.** Only launchable items can be moved this way. If
-  your selection includes a folder, PyCommander says so and does nothing —
+  your selection includes a folder, Start Menu says so and does nothing —
   deselect the folder and click **Cut** again. (To restructure folders
   themselves, [edit the menu file directly](#opening-the-menu-file-directly).)
 - **Cut replaces the previous cut.** Whatever is selected when you click
@@ -362,14 +362,14 @@ itself in a text editor — useful for changes the GUI doesn't offer directly,
 like moving a whole folder somewhere else, or bulk edits across many items.
 
 Which editor opens is controlled by the menu file's `options.editor` setting
-(see below); if that isn't set, PyCommander falls back to the `$VISUAL` or
+(see below); if that isn't set, Start Menu falls back to the `$VISUAL` or
 `$EDITOR` environment variables, and finally to your desktop's default
 handler for `.yaml` files.
 
-The PyCommander window stays open while you edit, but it does **not**
+The Start Menu window stays open while you edit, but it does **not**
 automatically notice your changes — edits made this way take effect the next
-time PyCommander is started, not immediately. (Edits made through the GUI's
-own dialogs, by contrast, take effect right away, since PyCommander made them
+time Start Menu is started, not immediately. (Edits made through the GUI's
+own dialogs, by contrast, take effect right away, since Start Menu made them
 itself and reloads the file after saving.)
 
 ## Icons
@@ -384,7 +384,7 @@ directly (see below).
 ## The Menu File
 
 Everything above is driven by a single YAML file — the one you pointed
-`start.sh` at. You don't need to hand-edit this file to use PyCommander; the
+`start.sh` at. You don't need to hand-edit this file to use Start Menu; the
 Edit-mode tools cover creating, renaming, reordering, moving, and deleting
 folders and items. This section is a reference for anyone who wants to edit the file
 directly (via `e`), or understand what the GUI is actually writing.
@@ -437,8 +437,8 @@ menu:
 
 ### Validation
 
-The file is fully validated every time PyCommander starts. If anything is
-wrong, PyCommander reports **every** problem it finds in one pass (not just
+The file is fully validated every time Start Menu starts. If anything is
+wrong, Start Menu reports **every** problem it finds in one pass (not just
 the first one), each tagged with the offending entry's location, e.g.:
 
 ```
@@ -449,8 +449,8 @@ menu.yaml has 2 problem(s):
 ```
 
 Any reported problem prevents the window from opening at all, since the menu
-tree can't be trusted to be complete — fix the file and start PyCommander
-again. A missing script file, a missing or empty `cwd:`, or a missing or
+tree can't be trusted to be complete — fix the file and restart Start
+Menu. A missing script file, a missing or empty `cwd:`, or a missing or
 malformed `tmux_session:`, is *not* caught at this stage (a script might live
 on a drive that isn't mounted yet, and an item edited before `cwd:` existed
 simply has none); those are only reported if you try to launch the item — see

@@ -1,6 +1,6 @@
-"""PyCommander: a keyboard-driven menu/launcher defined by a single YAML file."""
+"""Start Menu: a keyboard-driven menu/launcher defined by a single YAML file."""
 
-APP_NAME = "PyCommander"
+APP_NAME = "Start Menu"
 
 # A launcher is read at a glance from across the desk, not studied, so this
 # runs a few points above the desktop default. Shared by the menu view and

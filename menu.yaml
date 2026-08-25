@@ -1,8 +1,8 @@
-# PyCommander example menu.
+# Start Menu example menu.
 #
 # This is a starting point, not a real setup — it only uses applications and
 # commands that ship on a standard Ubuntu Desktop install, so it should run
-# as-is. Point PyCommander at a copy of this file, flip on "Edit" (or press
+# as-is. Point Start Menu at a copy of this file, flip on "Edit" (or press
 # "e" to open it in a text editor) to see how each entry is built, and start
 # swapping these items for your own. See README.md for the full reference.
 

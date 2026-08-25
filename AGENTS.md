@@ -2,7 +2,7 @@
 
 ## What this is
 
-PyCommander is a PyQt6 desktop app: a keyboard-driven menu for launching
+Start Menu is a PyQt6 desktop app: a keyboard-driven menu for launching
 scripts and commands. The entire menu is one YAML file (`menu.yaml`, path
 given as a CLI arg — see `README.md`); the whole interaction is four keys:
 **↑↓** to move, **→** to open a section, **←** to go back, **⏎** to launch.
@@ -22,13 +22,13 @@ with a required extra property (`tmux_session:`) and an external dependency.
 
 ## Architecture / top-level GUI
 
-- `pycommander/__main__.py` — entry point: argparse, `QApplication`, startup
+- `start_menu/__main__.py` — entry point: argparse, `QApplication`, startup
   validation, creates a starter `menu.yaml` if the given path doesn't exist.
-- `pycommander/menu.py` — the model: YAML in, a tree of `MenuNode` out, with
+- `start_menu/menu.py` — the model: YAML in, a tree of `MenuNode` out, with
   full validation (all errors collected and reported at once) and the
   reverse `dump_menu()` for saving edits back out.
-- `pycommander/launcher.py` — turns a `MenuNode` into a spawned process for
-  each of the four launch modes, detached from PyCommander's own session.
+- `start_menu/launcher.py` — turns a `MenuNode` into a spawned process for
+  each of the four launch modes, detached from Start Menu's own session.
   `tmux` mode wraps the command it would otherwise have run in a generated
   shell script that creates or reattaches to the session; its session-name
   and tmux-installed checks happen in Python first, so the failures that
@@ -42,7 +42,7 @@ with a required extra property (`tmux_session:`) and an external dependency.
   `kill-session` and `attach-session` but **not** for `set-option`,
   `display-message` or `capture-pane`, which is why the wrapper mixes the two
   forms.
-- `pycommander/window.py` — the GUI: `MainWindow` (header showing a back
+- `start_menu/window.py` — the GUI: `MainWindow` (header showing a back
   arrow button + the current breadcrumb — the whole bar hidden at the top
   level, where there's nothing to show and nowhere to back up to — the
   `MenuTreeView`, an **Edit** toggle switch + footer
@@ -60,7 +60,7 @@ with a required extra property (`tmux_session:`) and an external dependency.
   and the move only becomes real on **Paste**. Because a save-and-reload
   builds all-new `MenuNode` objects, any *other* edit while a cut is pending
   drops the cut — nothing is lost, since the items were never removed.
-- `pycommander/dialogs/` — the two editing dialogs opened from those action
+- `start_menu/dialogs/` — the two editing dialogs opened from those action
   icons, one per module: `folder_name.py` (`FolderNameDialog` — rename/create
   a section) and `item_edit.py` (`ItemEditDialog` — name, file-or-inline-`sh`,
   working directory, launch mode and — shown only for `tmux` mode — the

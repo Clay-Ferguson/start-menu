@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PyCommander launcher.
+# Start Menu launcher.
 #
 # uv builds/refreshes the virtualenv from pyproject.toml on every run, so there
 # is no install step. Usage: ./start.sh /path/to/menu.yaml
@@ -13,4 +13,4 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-exec uv run --directory "${HERE}" python -m pycommander "$@"
+exec uv run --directory "${HERE}" python -m start_menu "$@"

@@ -10,7 +10,7 @@ Commander's trailing underscore conventions:
 
 Everything is spawned with start_new_session=True and its streams pointed at
 /dev/null. That is what lets the menu window stay open after a launch: the
-child belongs to its own session, so quitting PyCommander never takes it down,
+child belongs to its own session, so quitting Start Menu never takes it down,
 and no pipe can ever fill up and stall the GUI thread.
 """
 
@@ -191,7 +191,7 @@ def build_command(node: MenuNode) -> str:
         # comment doesn't swallow the epilogue.
         lines += [
             "rc=$?",
-            "printf '\\n[pycommander] %s exited with status %s — press Enter to close…' "
+            "printf '\\n[start-menu] %s exited with status %s — press Enter to close…' "
             f"{shlex.quote(label)} \"$rc\"",
             "read -r",
         ]
@@ -260,7 +260,7 @@ def _build_tmux_wrapper(node: MenuNode, inner: str) -> str:
         # The window has no shell behind it on these paths, so anything printed
         # would vanish with the window; hold it open the way `hold` mode does.
         "hold() { printf '\\n%s' \"$1\"; read -r; }",
-        # PyCommander may itself have been started from a terminal inside tmux,
+        # Start Menu may itself have been started from a terminal inside tmux,
         # in which case $TMUX has been inherited all the way down to here — and
         # tmux refuses to attach when it thinks it's nesting. This window is a
         # brand new one, not a pane, so the inherited value is simply stale.
@@ -397,7 +397,7 @@ def _tmux(*args: str) -> str | None:
 
     Short-lived queries against the local tmux server, so unlike the launched
     scripts these are run and waited on. `_child_env` for the same reason the
-    scripts get it: PyCommander's own virtualenv has no business here.
+    scripts get it: Start Menu's own virtualenv has no business here.
     """
     try:
         result = subprocess.run(
@@ -442,11 +442,11 @@ def _spawn(argv: list[str]) -> None:
 
 
 def _child_env() -> dict[str, str]:
-    """Our environment minus PyCommander's own virtualenv.
+    """Our environment minus Start Menu's own virtualenv.
 
     start.sh runs us through `uv run`, which puts .venv/bin on PATH and sets
     VIRTUAL_ENV. Left in place those leak into every launched script, so a
-    script that runs `python` would get PyCommander's interpreter instead of
+    script that runs `python` would get Start Menu's interpreter instead of
     the system one. Launched scripts should see the environment they'd get
     from a terminal, not ours.
     """

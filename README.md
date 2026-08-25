@@ -1,4 +1,4 @@
-# PyCommander
+# Start Menu
 
 A keyboard-driven menu for launching scripts. The entire menu lives in one YAML
 file, and the whole interaction is four keys: **↑↓** to move, **→** to open a
@@ -17,7 +17,7 @@ and the icons are all explicit YAML properties.
 ./start.sh /path/to/menu.yaml
 ```
 
-The menu file's path is a required argument — PyCommander always reads (and
+The menu file's path is a required argument — Start Menu always reads (and
 writes, when you edit through the GUI) exactly the file you point it at. If
 that file doesn't exist yet, it's created automatically with a small starter
 example, so pointing at a new path just works.
@@ -26,7 +26,7 @@ example, so pointing at a new path just works.
 and refreshes the virtualenv from `pyproject.toml` on every run — there is no
 install step and nothing to activate.
 
-`./install.sh` adds a desktop entry so PyCommander shows up in your application
+`./install.sh` adds a desktop entry so Start Menu shows up in your application
 launcher. It prompts for the program's install directory and the menu file to
 use, and bakes both into the desktop entry's launch command; `./uninstall.sh`
 removes the entry.
@@ -223,7 +223,7 @@ menu.yaml has 2 problem(s):
   • menu[4] (Lingo Web): has both 'items:' and 'file:' — an item is either a section (items) or a script (file), not both.
 ```
 
-Any of them is fatal: fix the file and start PyCommander again. There is no
+Any of them is fatal: fix the file and restart Start Menu. There is no
 reload — editing the menu means restarting, which takes about as long.
 
 Missing script files are *not* an error at load time — a path may live on a
@@ -232,9 +232,9 @@ drive that isn't mounted yet. You get a dialog if you try to launch one.
 ## Layout
 
 ```
-start.sh              launcher (uv run python -m pycommander)
+start.sh              launcher (uv run python -m start_menu)
 menu.yaml             example menu (see "Example menu" above); point start.sh at your own file instead
-pycommander/
+start_menu/
   __main__.py         argparse, QApplication, startup validation
   menu.py             YAML -> MenuNode tree, with validation
   launcher.py         the four launch modes

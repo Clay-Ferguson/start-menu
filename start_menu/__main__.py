@@ -1,4 +1,4 @@
-"""Entry point: python -m pycommander MENU_FILE"""
+"""Entry point: python -m start_menu MENU_FILE"""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from .menu import LAUNCH_HOLD, MenuError, MenuNode, Options, dump_menu, load_men
 from .window import MainWindow, format_errors
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-ICON = os.path.join(PROJECT_ROOT, "pycommander.png")
+ICON = os.path.join(PROJECT_ROOT, "start-menu.png")
 
 STARTER_ITEM_NAME = "Example"
 
@@ -46,7 +46,7 @@ def main() -> int:
     # exists, which is invisible when launched from a desktop icon rather than a
     # terminal. Left optional here, the missing-argument case is instead reported
     # with a QMessageBox below, once the app exists to show one.
-    parser = argparse.ArgumentParser(prog="pycommander", description=__doc__)
+    parser = argparse.ArgumentParser(prog="start-menu", description=__doc__)
     parser.add_argument(
         "menu_file",
         nargs="?",
@@ -59,10 +59,10 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setApplicationDisplayName(APP_NAME)
-    # Ties the window to pycommander.desktop, so the desktop shows our icon in
+    # Ties the window to start-menu.desktop, so the desktop shows our icon in
     # the dock and alt-tab instead of a generic one. Without it the Wayland
     # app_id is derived from argv[0] ("python3") and matches nothing.
-    app.setDesktopFileName("pycommander")
+    app.setDesktopFileName("start-menu")
     if os.path.isfile(ICON):
         app.setWindowIcon(QIcon(ICON))
 
@@ -70,8 +70,8 @@ def main() -> int:
         QMessageBox.warning(
             None,
             f"{APP_NAME} — no menu file",
-            "PyCommander needs a menu file to run.\n\n"
-            "Usage: pycommander MENU_FILE\n\n"
+            "Start Menu needs a menu file to run.\n\n"
+            "Usage: start-menu MENU_FILE\n\n"
             "Pass the full path to your menu.yaml as a command-line argument "
             "(start.sh or the desktop entry's Exec= line is where this is set).",
         )

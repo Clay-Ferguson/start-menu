@@ -964,7 +964,7 @@ class MainWindow(QWidget):
         """Open the menu file itself in the configured editor.
 
         The window stays open, but nothing re-reads the file — edits take
-        effect the next time PyCommander starts.
+        effect the next time Start Menu starts.
         """
         error = open_in_editor(self.menu_path, self.options.resolved_editor())
         if error:

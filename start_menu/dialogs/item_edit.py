@@ -125,7 +125,7 @@ class ItemEditDialog(QDialog):
         pick_button.clicked.connect(self._pick_file)
         # Opens the path currently in _file_edit in the configured editor —
         # the same open_in_editor() used for the "e" (edit menu.yaml) shortcut
-        # — so a script can be edited without leaving PyCommander.
+        # — so a script can be edited without leaving Start Menu.
         self._edit_file_button = QPushButton("Edit")
         self._edit_file_button.setStyleSheet(BUTTON_STYLE)
         self._edit_file_button.clicked.connect(self._edit_file)

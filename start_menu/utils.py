@@ -20,7 +20,7 @@ def open_in_editor(path: str, editor: str) -> str | None:
 
     Routed through launch() as a detached inline snippet, so the editor is
     spawned exactly the way a `launch: detached` menu item would be — its own
-    session, surviving PyCommander. `editor` is shell text, so it may carry
+    session, surviving Start Menu. `editor` is shell text, so it may carry
     arguments of its own.
     """
     binary = shlex.split(editor)[0] if editor.strip() else ""
