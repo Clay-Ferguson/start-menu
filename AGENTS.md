@@ -8,9 +8,7 @@ given as a CLI arg — see `README.md`); the whole interaction is four keys:
 **↑↓** to move, **→** to open a section, **←** to go back, **⏎** to launch.
 One level is shown at a time — going into a section replaces the list rather
 than expanding it — so the menu stays the same size no matter how deep it
-gets. It's a rewrite of an older curses-based `Commander` tool, but here the
-tree, display names, launch modes and icons are explicit YAML properties
-instead of being encoded in filenames.
+gets. 
 
 A menu item is one of three things: a **section** (`items:`, nests further
 items), a **script file** (`file:`, a path on disk), or an inline **`sh:`**
@@ -75,7 +73,7 @@ same `load_menu()` validation startup uses, so the GUI always matches what's
 actually on disk.
 
 See `README.md` for the full menu-file reference and key list, and
-`USER_GUIDE.md` for end-user-facing documentation.
+`docs/USER_GUIDE.md` for end-user-facing documentation.
 
 ## Working in this repo
 

@@ -2,8 +2,7 @@
 
 The whole menu tree lives in a QStandardItemModel. Drilling down is
 `setRootIndex(child)` rather than expanding, so the view renders one level
-at a time — the navigation model of the original curses Commander — while
-still being a native tree with per-item icons.
+at a time — while still being a native tree with per-item icons.
 """
 
 from __future__ import annotations
@@ -465,7 +464,7 @@ class MenuTreeView(QTreeView):
     def ascend(self) -> None:
         came_from = self.rootIndex()
         if not came_from.isValid():
-            return  # already at the top level; Left does nothing, as in Commander
+            return  # already at the top level; Left does nothing
         self.setRootIndex(came_from.parent())
         # Land the highlight back on the section we just stepped out of, and
         # drop whatever was multi-selected on the level we're leaving.

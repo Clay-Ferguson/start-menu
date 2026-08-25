@@ -6,10 +6,9 @@ section, **←** to go back, **⏎** to launch. One level is shown at a time —
 into a section replaces the list rather than expanding it — so the menu stays
 the same size no matter how deep it gets. The mouse is never required.
 
-It is a PyQt6 rewrite of [Commander](../../commander), which derived its menu
-from a folder of scripts and encoded each script's launch behavior in trailing
-underscores on the filename. Here the tree, the display names, the launch modes
-and the icons are all explicit YAML properties.
+## Learn how to use with the [User Guide](docs/USER_GUIDE.md)
+
+![](docs/img/app-window.png)
 
 ## Running
 
@@ -154,9 +153,6 @@ Two things to know:
 | `terminal` | A fresh terminal window; the script replaces the shell, so the window closes the instant the script exits | Interactive scripts that prompt for sudo or do their own `read` |
 | `hold` | A fresh terminal window that stays open until you press Enter, showing the exit status | Scripts that print a report and exit quickly |
 | `tmux` | A fresh terminal window attached to a named [tmux session](#tmux-sessions); closing the window only detaches, and the script keeps running | Long-lived processes — servers, watchers, training runs — you want to check on later |
-
-The first three are the same behaviors Commander spelled as no suffix, `_`, and
-`__` respectively; `tmux` is new here.
 
 Scripts always run under `bash -lc` (a *login* shell), so they see the same
 `PATH` and profile they would get from a real terminal rather than the

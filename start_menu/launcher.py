@@ -1,7 +1,6 @@
 """Running the picked script.
 
-Four modes. The first three are carried over unchanged from the original
-Commander's trailing underscore conventions:
+Four modes:
 
   detached  no terminal window at all, output discarded          (was: no suffix)
   terminal  fresh window; closes the moment the script exits     (was: "_")
@@ -26,7 +25,6 @@ from typing import Callable
 
 from .menu import LAUNCH_DETACHED, LAUNCH_HOLD, LAUNCH_TMUX, MenuNode
 
-# Same preference order the original commander.sh used.
 TERMINALS = ("gnome-terminal", "konsole", "xfce4-terminal", "x-terminal-emulator", "xterm")
 
 # Stricter than tmux itself requires. tmux addresses panes as

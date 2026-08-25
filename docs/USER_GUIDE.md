@@ -19,6 +19,8 @@ that menu — adding, renaming, reordering, and removing folders and items —
 directly from within the app, or by opening the underlying file in a text
 editor. Both ways are covered below.
 
+![](/docs/img/app-window.png)
+
 ## Running Start Menu
 
 Start Menu is started with the path to a menu file:
@@ -108,6 +110,8 @@ By default, Start Menu opens ready to *use* the menu, not change it. To
 modify anything — add, rename, reorder, or remove folders and items — turn on
 **Edit mode** using the switch in the bottom-left corner of the window (next
 to the "Edit" label).
+
+![](/docs/img/settings-dialog.png)
 
 Turning edit mode on does three things:
 
