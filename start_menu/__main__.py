@@ -6,10 +6,11 @@ import argparse
 import os
 import sys
 
+import windowchrome
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
-from . import APP_NAME
+from . import APP_NAME, START_MENU_THEME
 from .menu import LAUNCH_HOLD, MenuError, MenuNode, Options, dump_menu, load_menu
 from .window import MainWindow, format_errors
 
@@ -56,6 +57,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    # Before the QApplication, and it has to be: `configure()` picks the Wayland
+    # decoration plugin through an environment variable that the platform plugin
+    # reads during that constructor and never again. See
+    # `../windowchrome/README.md`.
+    windowchrome.configure(START_MENU_THEME)
+
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setApplicationDisplayName(APP_NAME)
@@ -65,6 +72,13 @@ def main() -> int:
     app.setDesktopFileName("start-menu")
     if os.path.isfile(ICON):
         app.setWindowIcon(QIcon(ICON))
+
+    # After the QApplication, and after anything that changes the application
+    # palette: `install()` captures the body's own surface and text colors at
+    # the moment it runs, then hands the title bar those palette roles. Start
+    # Menu tunes no palette of its own, so here is as late as it gets — but a
+    # palette changed after this line is one it never saw.
+    windowchrome.install(app)
 
     if args.menu_file is None:
         QMessageBox.warning(

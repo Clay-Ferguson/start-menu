@@ -25,6 +25,32 @@ example, so pointing at a new path just works.
 and refreshes the virtualenv from `pyproject.toml` on every run — there is no
 install step and nothing to activate.
 
+### The `windowchrome` sibling project
+
+Start Menu's colored title bar and window border come from
+**[windowchrome](https://github.com/<your-account>/windowchrome)**, a small
+reusable PyQt6 library kept in its own repository so several apps can wear the
+same chrome. It is **not on PyPI**: `pyproject.toml` resolves it by path, from a
+directory sitting *beside* this one.
+
+```bash
+cd ..                      # the directory holding start-menu/
+git clone https://github.com/<your-account>/windowchrome.git
+```
+
+giving:
+
+```
+projects/
+├── start-menu/
+└── windowchrome/          <- must be a sibling, and named this
+```
+
+If it is missing, `./start.sh` fails immediately with an unresolved path
+dependency rather than with anything subtle. The checkout is used in place —
+`uv` installs it editable, so there is nothing to build and an edit there is
+live here on the next run.
+
 `./install.sh` adds a desktop entry so Start Menu shows up in your application
 launcher. It prompts for the program's install directory and the menu file to
 use, and bakes both into the desktop entry's launch command; `./uninstall.sh`
@@ -235,6 +261,7 @@ start_menu/
   menu.py             YAML -> MenuNode tree, with validation
   launcher.py         the four launch modes
   window.py           MenuTreeView (the navigation) + MainWindow
+  dialogs/            the editing dialogs, over a shared style.py
 ```
 
 The tree is a real `QTreeView` over a `QStandardItemModel`; showing one level at

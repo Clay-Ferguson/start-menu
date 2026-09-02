@@ -6,9 +6,20 @@ requires-python = ">=3.11"
 dependencies = [
     "PyQt6>=6.6",
     "PyYAML>=6.0",
+    "windowchrome",
 ]
+
+# `windowchrome` is our own library — the colored title bar — and it is not on
+# PyPI: it is resolved by path from a *sibling* checkout, so
+# `../windowchrome` has to exist beside this directory or `uv run` fails with an
+# unresolved path dependency. `editable` so an edit there is live here on the
+# next run, with nothing to rebuild.
+[tool.uv.sources]
+windowchrome = { path = "../windowchrome", editable = true }
 
 # Not an installable package: uv only builds the virtualenv from the
 # dependencies above, and start.sh runs the code straight out of the tree.
+# (That governs Start Menu itself; the source above is a dependency and
+# unaffected.)
 [tool.uv]
 package = false

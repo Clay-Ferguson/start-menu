@@ -22,6 +22,8 @@ with a required extra property (`tmux_session:`) and an external dependency.
 
 - `start_menu/__main__.py` — entry point: argparse, `QApplication`, startup
   validation, creates a starter `menu.yaml` if the given path doesn't exist.
+  Also the two `windowchrome` setup calls, which are order-sensitive — see the
+  window-chrome entry below.
 - `start_menu/menu.py` — the model: YAML in, a tree of `MenuNode` out, with
   full validation (all errors collected and reported at once) and the
   reverse `dump_menu()` for saving edits back out.
@@ -74,6 +76,51 @@ actually on disk.
 
 See `README.md` for the full menu-file reference and key list, and
 `docs/USER_GUIDE.md` for end-user-facing documentation.
+
+## Things that will bite you
+
+- **The window chrome lives in `windowchrome`, not here — read
+  `../windowchrome/README.md` before touching any of it.** The colored title
+  bar — and with it the thin frame the decoration draws down the sides and along
+  the bottom — is a sibling library (`[tool.uv.sources]` in `pyproject.toml`
+  points at `../windowchrome`, editable, so an edit there is live here with no
+  reinstall; the checkout has to *be* a sibling or `uv run` fails outright).
+  Its README carries the whole of what was measured: that the bar is colorable
+  only on Wayland and only by repurposing three application palette roles; that
+  `libadwaita.so` links no `QPalette` symbol at all while `bradient` does,
+  which is what `QT_WAYLAND_DECORATION` is choosing between; that the
+  decoration's `QMargins{3, 30, 3, 3}` are compiled-in constants, so neither
+  the bar's height nor the frame's 3px is adjustable; and that giving a widget
+  a stylesheet severs its palette inheritance, which is why an application
+  event filter hands the body colors back. That last one is not hypothetical
+  here — `MenuTreeView` styles itself, and so does every label, button and
+  input field in the app.
+
+  What this app owes it, and what will break if it is forgotten:
+  `windowchrome.configure(START_MENU_THEME)` **before** `QApplication` and
+  `windowchrome.install(app)` **after** it — both in `__main__`, and both
+  order-sensitive, the first because the decoration plugin is chosen by an
+  environment variable read inside that constructor. That is the whole
+  integration: two calls, and nothing about any window's layout changes. The
+  dialogs keep the gray `dialogFrame` QFrame they always had.
+
+  `START_MENU_THEME` is in `start_menu/__init__.py`, beside `APP_NAME` and
+  `UI_POINT_SIZE`. It matches the other apps here deliberately.
+
+  Nothing in this app derives a color from the palette's `Window` or
+  `WindowText` roles, so the `body_window_color()` / `body_text_color()` rule
+  the library states costs nothing here — the one palette read in the codebase
+  is `dialogs/style.py`'s, and it reads `Base`, which the title bar never
+  touches. Keep it that way: a new color derived from `Window` would come out
+  tinted with the title bar blue.
+
+  `QMessageBox` deliberately calls none of this and keeps the title bar's
+  colors, being transient.
+
+  The library briefly also painted a thicker border just inside every window
+  (`bordered_body()`), which replaced the dialogs' own gray frame. It was
+  removed: the decoration's own 3px frame, which takes the title bar's color
+  for free, is what the design wants. Do not reintroduce it.
 
 ## Working in this repo
 
