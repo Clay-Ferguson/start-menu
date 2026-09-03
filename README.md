@@ -28,14 +28,14 @@ install step and nothing to activate.
 ### The `windowchrome` sibling project
 
 Start Menu's colored title bar and window border come from
-**[windowchrome](https://github.com/<your-account>/windowchrome)**, a small
+**[windowchrome](https://github.com/Clay-Ferguson/windowchrome)**, a small
 reusable PyQt6 library kept in its own repository so several apps can wear the
 same chrome. It is **not on PyPI**: `pyproject.toml` resolves it by path, from a
 directory sitting *beside* this one.
 
 ```bash
 cd ..                      # the directory holding start-menu/
-git clone https://github.com/<your-account>/windowchrome.git
+git clone https://github.com/Clay-Ferguson/windowchrome.git
 ```
 
 giving:
