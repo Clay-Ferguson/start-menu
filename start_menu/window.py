@@ -35,6 +35,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from windowchrome import apply_scrollbars
 
 from . import APP_NAME, UI_POINT_SIZE
 from .dialogs import FolderNameDialog, ItemEditDialog
@@ -220,6 +221,14 @@ class MenuTreeView(QTreeView):
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # The menu *is* the application, so its own scroll bar is the one that
+        # matters most: drawn at twice the desktop's thickness so a long level
+        # is easy to drag through. No `base` — unlike the dialogs' input
+        # fields, the rows sit on the palette's own Base, which is what
+        # `apply_scrollbars` assumes. It goes on the view's scroll bar children,
+        # so `_stylesheet()` below can keep being re-applied to the view itself
+        # (edit mode toggles it) without disturbing the bars.
+        apply_scrollbars(self)
         self.setItemDelegate(RowActionDelegate(self))
         self.doubleClicked.connect(self._activate)
 

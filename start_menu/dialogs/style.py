@@ -20,7 +20,7 @@ LABEL_STYLE = f"font-size: {UI_POINT_SIZE}pt;"
 BUTTON_STYLE = f"QPushButton {{ font-size: {UI_POINT_SIZE}pt; padding: 8px 20px; }}"
 
 
-def field_background() -> str:
+def field_background() -> QColor:
     """A background a shade lighter than the theme's default input color.
 
     Computed from the live application palette (rather than a fixed hex)
@@ -28,9 +28,13 @@ def field_background() -> str:
     background is, instead of assuming a light or a dark theme. Queried
     lazily — at dialog-build time, not import time — since no theme is
     attached to the palette until QApplication exists.
+
+    Returned as a QColor rather than a hex string because most of what wants
+    it wants the color: `field_border()` derives from it, and the `sh` editor
+    hands it to `apply_scrollbars`. Only a stylesheet needs `.name()`.
     """
     base = QApplication.palette().color(QPalette.ColorRole.Base)
-    return base.lighter(130).name()
+    return base.lighter(130)
 
 
 def field_border() -> str:
@@ -49,7 +53,7 @@ def field_border() -> str:
     black Base (some high-contrast and OLED themes) the value component is
     zero and *neither* direction moves, so the last resort is a fixed gray.
     """
-    background = QColor(field_background())
+    background = field_background()
     lightened = background.lighter(140)
     if lightened != background:
         return lightened.name()
@@ -65,5 +69,6 @@ def field_style() -> str:
     `field_border`."""
     return (
         f"padding: 8px; font-size: {UI_POINT_SIZE}pt;"
-        f" background-color: {field_background()}; border: 1px solid {field_border()};"
+        f" background-color: {field_background().name()};"
+        f" border: 1px solid {field_border()};"
     )

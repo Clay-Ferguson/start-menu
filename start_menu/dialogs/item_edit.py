@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from windowchrome import apply_scrollbars
 
 from .. import UI_POINT_SIZE
 from ..menu import (
@@ -147,12 +148,19 @@ class ItemEditDialog(QDialog):
         # without scrolling — no syntax highlighting, just a plain editor.
         mono_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
         mono_font.setPointSize(UI_POINT_SIZE)
+        sh_background = field_background()
         self._sh_edit = QPlainTextEdit(sh or "")
         self._sh_edit.setFont(mono_font)
         self._sh_edit.setStyleSheet(
-            f"background-color: {field_background()}; border: 1px solid {field_border()};"
+            f"background-color: {sh_background.name()};"
+            f" border: 1px solid {field_border()};"
         )
         self._sh_edit.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        # The wide scroll bars the rest of the app uses. Handed the field's own
+        # background, since it is not the palette's Base `apply_scrollbars`
+        # would otherwise assume and the groove would read as a darker stripe
+        # against it. Both bars: NoWrap means the horizontal one really appears.
+        apply_scrollbars(self._sh_edit, sh_background)
         metrics = QFontMetrics(mono_font)
         self._sh_edit.setMinimumSize(
             metrics.horizontalAdvance("M") * SH_EDITOR_COLUMNS + 24,
