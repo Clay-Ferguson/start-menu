@@ -16,7 +16,6 @@ from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -29,7 +28,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from windowchrome import apply_scrollbars
+from windowchrome import apply_radios, apply_scrollbars
 
 from .. import UI_POINT_SIZE
 from ..menu import (
@@ -41,7 +40,13 @@ from ..menu import (
     LAUNCH_TMUX,
 )
 from ..utils import open_in_editor
-from .style import BORDER_STYLE, BUTTON_STYLE, LABEL_STYLE, field_background, field_border, field_style
+from .style import (
+    BUTTON_STYLE,
+    LABEL_STYLE,
+    field_background,
+    field_border,
+    field_style,
+)
 
 # Friendly text for the launch-mode combobox; the underlying values (stored
 # as each item's data) are the same strings menu.py reads and writes.
@@ -106,8 +111,16 @@ class ItemEditDialog(QDialog):
         is_sh = sh is not None
         self._file_radio = QRadioButton("File")
         self._sh_radio = QRadioButton("Bash script")
-        for radio in (self._file_radio, self._sh_radio):
-            radio.setStyleSheet(LABEL_STYLE)
+        # The enlarged, visibly-outlined indicator is windowchrome's, not this
+        # app's: the native one is small and rings itself in a near-black that
+        # disappears against this dialog. `base` is the fields' own lightened
+        # color, for the same reason `apply_scrollbars` is given it (README §10).
+        apply_radios(
+            self._file_radio,
+            self._sh_radio,
+            base=field_background(),
+            point_size=UI_POINT_SIZE,
+        )
         self._type_group = QButtonGroup(self)
         self._type_group.addButton(self._file_radio)
         self._type_group.addButton(self._sh_radio)
@@ -240,29 +253,23 @@ class ItemEditDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
-        frame = QFrame(self)
-        frame.setObjectName("dialogFrame")
-        frame.setStyleSheet(BORDER_STYLE)
-
-        frame_layout = QVBoxLayout(frame)
-        frame_layout.setContentsMargins(24, 24, 24, 24)
-        frame_layout.setSpacing(14)
-        frame_layout.addWidget(name_label)
-        frame_layout.addWidget(self._name_edit)
-        frame_layout.addLayout(type_row)
-        frame_layout.addWidget(self._stack, 1)
-        frame_layout.addWidget(cwd_label)
-        frame_layout.addWidget(self._cwd_edit)
-        frame_layout.addLayout(cwd_button_row)
-        frame_layout.addWidget(launch_label)
-        frame_layout.addLayout(launch_row)
-        frame_layout.addWidget(self._tmux_label)
-        frame_layout.addWidget(self._tmux_edit)
-        frame_layout.addWidget(buttons)
-
-        outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(10, 10, 10, 10)
-        outer_layout.addWidget(frame)
+        # Laid out straight onto the dialog: the window decoration already
+        # draws an edge of its own, so there's no bordered frame in between.
+        content_layout = QVBoxLayout(self)
+        content_layout.setContentsMargins(24, 24, 24, 24)
+        content_layout.setSpacing(14)
+        content_layout.addWidget(name_label)
+        content_layout.addWidget(self._name_edit)
+        content_layout.addLayout(type_row)
+        content_layout.addWidget(self._stack, 1)
+        content_layout.addWidget(cwd_label)
+        content_layout.addWidget(self._cwd_edit)
+        content_layout.addLayout(cwd_button_row)
+        content_layout.addWidget(launch_label)
+        content_layout.addLayout(launch_row)
+        content_layout.addWidget(self._tmux_label)
+        content_layout.addWidget(self._tmux_edit)
+        content_layout.addWidget(buttons)
 
         self._name_edit.textChanged.connect(self._validate)
         self._file_edit.textChanged.connect(self._validate)

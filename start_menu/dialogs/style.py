@@ -1,7 +1,7 @@
 """Styling shared by the editing dialogs.
 
-Kept in its own module because both dialogs draw the same bordered frame and
-the same lightened input fields; anything only one of them needs lives in
+Kept in its own module because the dialogs share the same lightened input
+fields and button/label sizing; anything only one of them needs lives in
 that dialog's own module instead.
 """
 
@@ -12,9 +12,11 @@ from PyQt6.QtWidgets import QApplication
 
 from .. import UI_POINT_SIZE
 
-# A plain QDialog's outer edge is easy to lose against the desktop behind it,
-# so the real content sits inside a bordered QFrame instead — a QDialog won't
-# reliably paint a stylesheet border of its own, but a QFrame always will.
+# The folder-name dialog is small enough that its outer edge is easy to lose
+# against the desktop behind it, so its content sits inside a bordered QFrame
+# — a QDialog won't reliably paint a stylesheet border of its own, but a
+# QFrame always will. ItemEditDialog deliberately has none: it is big enough
+# that the decoration's own frame is edge enough.
 BORDER_STYLE = "#dialogFrame { border: 1px solid #a0a0a0; border-radius: 6px; }"
 LABEL_STYLE = f"font-size: {UI_POINT_SIZE}pt;"
 BUTTON_STYLE = f"QPushButton {{ font-size: {UI_POINT_SIZE}pt; padding: 8px 20px; }}"
@@ -72,3 +74,4 @@ def field_style() -> str:
         f" background-color: {field_background().name()};"
         f" border: 1px solid {field_border()};"
     )
+
