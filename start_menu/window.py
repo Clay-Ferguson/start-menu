@@ -11,7 +11,6 @@ import os
 
 from PyQt6.QtCore import QModelIndex, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import (
-    QColor,
     QIcon,
     QKeySequence,
     QPainter,
@@ -21,7 +20,6 @@ from PyQt6.QtGui import (
     QStandardItemModel,
 )
 from PyQt6.QtWidgets import (
-    QAbstractButton,
     QAbstractItemView,
     QDialog,
     QHBoxLayout,
@@ -35,7 +33,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from windowchrome import apply_scrollbars
+from windowchrome import ToggleSwitch, apply_scrollbars
 
 from . import APP_NAME, UI_POINT_SIZE
 from .dialogs import FolderNameDialog, ItemEditDialog
@@ -146,36 +144,6 @@ class RowActionDelegate(QStyledItemDelegate):
         right = row_rect.right() - ACTION_ICON_MARGIN - slot * (ACTION_ICON_SIZE + ACTION_ICON_MARGIN)
         top = row_rect.top() + (row_rect.height() - ACTION_ICON_SIZE) // 2
         return QRect(right - ACTION_ICON_SIZE, top, ACTION_ICON_SIZE, ACTION_ICON_SIZE)
-
-
-class ToggleSwitch(QAbstractButton):
-    """A small on/off switch, styled like a mobile settings toggle.
-
-    QCheckBox's indicator is themed by the desktop's QStyle and awkward to
-    reshape into a switch; a bare checkable QAbstractButton with its own
-    paintEvent gives full control over the track/knob look instead.
-    """
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setCheckable(True)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedSize(40, 22)
-
-    def paintEvent(self, event) -> None:
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(Qt.PenStyle.NoPen)
-
-        track_color = QColor(HIGHLIGHT_BG if self.isChecked() else "#888888")
-        painter.setBrush(track_color)
-        radius = self.height() / 2
-        painter.drawRoundedRect(self.rect(), radius, radius)
-
-        knob_diameter = self.height() - 4
-        knob_x = self.width() - knob_diameter - 2 if self.isChecked() else 2
-        painter.setBrush(QColor("#ffffff"))
-        painter.drawEllipse(int(knob_x), 2, knob_diameter, knob_diameter)
 
 
 class MenuTreeView(QTreeView):
@@ -605,7 +573,7 @@ class MainWindow(QWidget):
         self.tree.level_changed.connect(self._update_edit_buttons)
         self.tree.selection_changed.connect(self._update_edit_buttons)
 
-        self.edit_toggle = ToggleSwitch(self)
+        self.edit_toggle = ToggleSwitch(self, on_color=HIGHLIGHT_BG)
         self.edit_toggle.toggled.connect(self._handle_edit_toggled)
 
         edit_label = QLabel("Edit")
