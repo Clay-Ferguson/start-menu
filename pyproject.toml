@@ -9,7 +9,7 @@ dependencies = [
     "windowchrome",
 ]
 
-# `windowchrome` is our own library — the colored title bar — and it is not on
+# `windowchrome` is our own library of shared widget styling and it is not on
 # PyPI: it is resolved by path from a *sibling* checkout, so
 # `../windowchrome` has to exist beside this directory or `uv run` fails with an
 # unresolved path dependency. `editable` so an edit there is live here on the

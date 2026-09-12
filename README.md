@@ -18,7 +18,7 @@ The menu file's path is a required argument — Start Menu always reads (and wri
 
 ### The `windowchrome` sibling project
 
-Start Menu's colored title bar and window border come from **[windowchrome](https://github.com/Clay-Ferguson/windowchrome)**, a small reusable PyQt6 library kept in its own repository so several apps can wear the same chrome. It is **not on PyPI**: `pyproject.toml` resolves it by path, from a directory sitting *beside* this one.
+Start Menu's wide scroll bars, enlarged radio buttons and **Edit** toggle switch come from **[windowchrome](https://github.com/Clay-Ferguson/windowchrome)**, a small reusable PyQt6 library kept in its own repository so several apps can share the same look. It is **not on PyPI**: `pyproject.toml` resolves it by path, from a directory sitting *beside* this one.
 
 ```bash
 cd ..                      # the directory holding start-menu/
