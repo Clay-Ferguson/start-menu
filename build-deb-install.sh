@@ -137,13 +137,23 @@ INSTALLED_SIZE="$(du -sk --exclude=DEBIAN "$STAGE" | cut -f1)"
 # tmux by the 'tmux' mode, but neither is a hard dependency: launcher.py checks
 # for them and explains itself in a dialog, so a machine that never uses those
 # modes has no reason to carry them.
+#
+# libqt6svg6 *is* a hard dependency, for a reason that is not obvious: it
+# carries Qt's SVG image-format plugin, and without it Qt cannot read an icon
+# file that a desktop theme ships only as .svg. Yaru keeps its arrows that way
+# (scalable/actions/go-up-symbolic.svg and friends), so on a machine with only
+# python3-pyqt6 installed, QIcon.fromTheme("go-previous") and every arrow
+# QStyle.standardIcon() resolves through the theme comes back *empty* — the
+# window then falls back to Qt's own built-in arrow art and quietly stops
+# matching the rest of the desktop. apt does not pull this in on its own:
+# python3-pyqt6 does not depend on it.
 cat > "$STAGE/DEBIAN/control" <<EOF
 Package: $PACKAGE
 Version: $VERSION
 Section: utils
 Priority: optional
 Architecture: $ARCH
-Depends: python3 (>= 3.11), python3-pyqt6, python3-yaml
+Depends: python3 (>= 3.11), python3-pyqt6, python3-yaml, libqt6svg6
 Recommends: qt6-wayland, x-terminal-emulator
 Suggests: tmux
 Maintainer: $START_MENU_MAINTAINER

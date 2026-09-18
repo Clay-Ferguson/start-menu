@@ -78,7 +78,7 @@ By default, Start Menu opens ready to *use* the menu, not change it. To modify a
 Turning edit mode on does three things:
 
 1. The editing buttons appear in the toolbar just below the header: **New Folder** and **New Item** always, and **Cut**, **Undo Cut** and **Paste** whenever they apply (see [Moving Items Between Folders](#moving-items-between-folders)).
-2. The currently highlighted row grows a set of small action icons on its right edge: **move up**, **move down**, **edit**, and **delete** (in that order, right to left). These icons only ever appear on the highlighted row — move the highlight with the arrow keys and they follow it.
+2. The currently highlighted row grows a set of action icons on its right edge: **move up**, **move down**, **edit**, and **delete** (in that order, right to left). These icons only ever appear on the highlighted row — move the highlight with the arrow keys and they follow it.
 3. You can select more than one row at a time — hold **Ctrl** and click to add or remove individual rows, or hold **Shift** and click to select a run of them. This is only useful for **Cut**; turning edit mode back off collapses the selection to a single row again.
 
 Edit mode is **not remembered** between runs — every time you start Start Menu, it opens with edit mode off, so you don't accidentally leave the menu editable.

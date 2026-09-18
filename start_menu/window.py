@@ -46,16 +46,21 @@ NODE_ROLE = Qt.ItemDataRole.UserRole
 HINTS = "⏎ launch    e edit menu    q quit"
 
 MENU_POINT_SIZE = UI_POINT_SIZE  # local alias: this file spells it out a lot
-ICON_SIZE = 28
-BACK_ICON_SIZE = 20  # the header's "go up a level" arrow
-BACK_BUTTON_SIZE = 30  # the clickable square that arrow sits in
+# A menu item's own icon. 32 rather than a rounder-looking number because it
+# is a size the desktop icon themes actually ship a bitmap for (16/24/32/48):
+# anything between those is the same picture stretched, and looks it.
+ICON_SIZE = 32
+BACK_ICON_SIZE = 24  # the header's "go up a level" arrow
+BACK_BUTTON_SIZE = 36  # the clickable square that arrow sits in
 ROW_PADDING = 10  # px above and below each row's text
 TOOLTIP_LINES = 12  # of an inline sh snippet, before the tooltip is truncated
 
 # Right-justified per-row action icons. Slots are numbered from the row's
 # right edge, 0 = rightmost, so new icons can join without moving the old
 # ones. Left to right on screen: move up, move down, edit, delete.
-ACTION_ICON_SIZE = 20
+# `_at_size` decouples these from the sizes an icon theme actually ships, so
+# the number here is free to be whatever reads best on the row.
+ACTION_ICON_SIZE = 28
 ACTION_ICON_MARGIN = 8  # px around and between icons
 DELETE_SLOT = 0
 EDIT_SLOT = 1
@@ -69,6 +74,15 @@ ACTION_AREA_WIDTH = ACTION_ICON_MARGIN + ACTION_SLOT_COUNT * (ACTION_ICON_SIZE +
 # darker, less saturated orange instead of following the system accent.
 HIGHLIGHT_BG = "#9e4b2e"
 HIGHLIGHT_FG = "#ffffff"
+# A wash of the same orange, for the row under the mouse. The rows are given
+# an explicit background (see `_stylesheet`), which costs them the hover the
+# native style would otherwise have drawn, so it is drawn here instead.
+HOVER_BG = "rgba(158, 75, 46, 56)"
+
+# The size a menu item's icon is pulled out of its theme at, before being
+# handed on at whatever size the row needs; see `_at_size`. Large enough that
+# every theme's biggest bitmap is what comes back.
+_ICON_SOURCE_SIZE = 256
 
 
 def _edit_icon() -> QIcon:
@@ -112,6 +126,41 @@ def _back_icon(style: QStyle) -> QIcon:
     return QIcon(pixmap)
 
 
+def _at_size(source: QIcon, size: int) -> QIcon:
+    """`source` re-wrapped so that it really does render at `size` px.
+
+    An icon theme ships a handful of fixed sizes and Qt's theme-icon engine
+    hands back the nearest one rather than the size asked for — and older Qt
+    will not scale one *up* at all: ask Yaru for a 32px folder and the Qt 6.4
+    the `.deb` runs against returns the 16px file, so the menu came out with
+    icons half the size they are here. Pulling the icon at a size every theme
+    ships large, and handing that pixmap to a plain pixmap-backed QIcon —
+    which has no such scruples, and shrinks whatever it is given — gets the
+    size we asked for out of every Qt.
+    """
+    pixmap = source.pixmap(QSize(_ICON_SOURCE_SIZE, _ICON_SOURCE_SIZE))
+    if pixmap.isNull():
+        return source
+    if pixmap.width() < size:
+        # Nothing bigger than `size` exists anywhere in the icon; scaling it up
+        # here at least fills the space the row reserves, rather than leaving a
+        # small picture adrift in the middle of it.
+        pixmap = pixmap.scaled(
+            size,
+            size,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+    icon = QIcon(pixmap)
+    # Register the same picture as the *selected* face too. Left to itself, Qt
+    # makes that one up by washing the icon in the palette's Highlight color —
+    # the desktop accent, not the orange this app pins its selection bar to
+    # (see HIGHLIGHT_BG) — so the icon on the current row came out tinted a
+    # color nothing else on screen uses, and a different one on each Qt.
+    icon.addPixmap(pixmap, QIcon.Mode.Selected)
+    return icon
+
+
 class RowActionDelegate(QStyledItemDelegate):
     """Draws the right-justified action icon(s) on top of the current row.
 
@@ -123,11 +172,18 @@ class RowActionDelegate(QStyledItemDelegate):
 
     def __init__(self, parent: QTreeView) -> None:
         super().__init__(parent)
+        # `_at_size` on each: a desktop icon theme ships a handful of fixed
+        # sizes and Qt hands back the nearest one rather than the size asked
+        # for, so without it these come out at whatever the theme happens to
+        # have (16px, most often) instead of ACTION_ICON_SIZE.
         self._icons = {
-            "edit": _edit_icon(),
-            "delete": parent.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon),
-            "up": parent.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp),
-            "down": parent.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown),
+            kind: _at_size(icon, ACTION_ICON_SIZE)
+            for kind, icon in (
+                ("edit", _edit_icon()),
+                ("delete", parent.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon)),
+                ("up", parent.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp)),
+                ("down", parent.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown)),
+            )
         }
 
     def paint(self, painter, option, index) -> None:
@@ -168,6 +224,10 @@ class MenuTreeView(QTreeView):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.edit_mode = False  # off by default; never persisted across runs
+        # Menu items share a handful of icons between them (nearly always just
+        # the standard folder and file), and `_at_size` does real work to build
+        # one, so they are built once per distinct `icon:` and reused.
+        self._icon_cache: dict[str, QIcon] = {}
         self._hidden_ids: set[int] = set()  # id()s of the nodes a pending cut hides
         # Set by MainWindow, which owns every dialog this GUI puts up; see
         # launcher.launch's `on_running_session`. Left None (as it is in
@@ -207,8 +267,20 @@ class MenuTreeView(QTreeView):
         right_padding = ACTION_AREA_WIDTH if self.edit_mode else 10
         return (
             f"QTreeView {{ padding: 6px 0; }}"
-            f"QTreeView::item {{ padding: {ROW_PADDING}px {right_padding}px"
-            f" {ROW_PADDING}px 10px; }}"
+            # `background` looks redundant next to a transparent row, but it is
+            # what makes the padding apply at all. Qt hands a row back to the
+            # native style to paint whenever the item rule has nothing of its
+            # own to draw, and the native painter knows nothing about the
+            # rule's padding — which on the Qt 6.4 the `.deb` runs against left
+            # the indent showing on the selected row only, the one row whose
+            # rule *does* carry a background. Naming one here, even an
+            # invisible one, puts every row on the same painting path.
+            f"QTreeView::item {{ background: transparent;"
+            f" padding: {ROW_PADDING}px {right_padding}px {ROW_PADDING}px 10px; }}"
+            f"QTreeView::item:hover {{ background: {HOVER_BG}; }}"
+            # After :hover, so the selected row keeps its full-strength bar
+            # when the mouse is over it; both rules are equally specific, so
+            # this is decided by which comes last.
             # Both :active and :!active, so the bar keeps its color instead of
             # graying out whenever the window loses focus.
             f"QTreeView::item:selected {{"
@@ -398,6 +470,13 @@ class MenuTreeView(QTreeView):
                 self._populate(item, node.children)
 
     def _icon_for(self, node: MenuNode) -> QIcon:
+        key = node.icon or ("section" if node.is_section else "item")
+        if key not in self._icon_cache:
+            self._icon_cache[key] = _at_size(self._source_icon(node), ICON_SIZE)
+        return self._icon_cache[key]
+
+    def _source_icon(self, node: MenuNode) -> QIcon:
+        """The icon the node names, or the desktop's own folder/file icon."""
         if node.icon:
             path = os.path.expanduser(os.path.expandvars(node.icon))
             icon = QIcon(path) if os.path.isfile(path) else QIcon.fromTheme(node.icon)
@@ -513,7 +592,7 @@ class MainWindow(QWidget):
         # nothing on screen otherwise says how to get back out of a section
         # you clicked your way into.
         self.back_button = QToolButton()
-        self.back_button.setIcon(_back_icon(self.style()))
+        self.back_button.setIcon(_at_size(_back_icon(self.style()), BACK_ICON_SIZE))
         self.back_button.setIconSize(QSize(BACK_ICON_SIZE, BACK_ICON_SIZE))
         self.back_button.setFixedSize(BACK_BUTTON_SIZE, BACK_BUTTON_SIZE)  # a comfortable target
         self.back_button.setAutoRaise(True)  # flat until hovered
