@@ -12,13 +12,15 @@ Everything you see in the menu is backed by a menu file on disk. You can edit th
 
 ## Running Start Menu
 
-Start Menu is started with the path to a menu file:
+If you installed Start Menu as a package, it's in your application launcher, and `start-menu` runs it from a terminal. From a source checkout it's `./start.sh`. Either way you can name a menu file, or let it use the default:
 
 ```bash
-./start.sh /path/to/menu.yaml
+start-menu                        # installed: uses ~/.config/start-menu/menu.yaml
+./start.sh                        # from a checkout: the same default
+./start.sh /path/to/menu.yaml     # or exactly the file you name
 ```
 
-If the file you point it at doesn't exist yet, Start Menu creates it automatically with a small starter item, so pointing it at a brand-new path just works — you'll have something to look at and edit immediately.
+If the file doesn't exist yet — including that default one, the first time you ever run Start Menu — it's created for you as a copy of the bundled example menu, so you land in a working menu with something to look at and edit immediately rather than a blank window.
 
 If the menu file exists but has a problem (invalid YAML, or a menu entry that's missing something it needs), Start Menu won't open a broken window — instead it shows a dialog listing every problem found, so you can fix them all in one pass before trying again.
 

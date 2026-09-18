@@ -9,10 +9,11 @@ A keyboard-driven menu for launching scripts. The entire menu lives in one YAML 
 ## Running
 
 ```bash
-./start.sh /path/to/menu.yaml
+./start.sh                      # uses ~/.config/start-menu/menu.yaml
+./start.sh /path/to/menu.yaml   # or exactly the file you name
 ```
 
-The menu file's path is a required argument — Start Menu always reads (and writes, when you edit through the GUI) exactly the file you point it at. If that file doesn't exist yet, it's created automatically with a small starter example, so pointing at a new path just works.
+The menu file's path is optional. With no argument Start Menu uses `~/.config/start-menu/menu.yaml`; given one, it reads (and writes, when you edit through the GUI) exactly the file you point it at. Either way, if the file doesn't exist yet it's created as a copy of the [example menu](#example-menu) below, so a first run just works.
 
 `start.sh` runs the app through [uv](https://docs.astral.sh/uv/), which creates and refreshes the virtualenv from `pyproject.toml` on every run — there is no install step and nothing to activate.
 
@@ -35,7 +36,38 @@ projects/
 
 If it is missing, `./start.sh` fails immediately with an unresolved path dependency rather than with anything subtle. The checkout is used in place — `uv` installs it editable, so there is nothing to build and an edit there is live here on the next run.
 
-`./install.sh` adds a desktop entry so Start Menu shows up in your application launcher. It prompts for the program's install directory and the menu file to use, and bakes both into the desktop entry's launch command; `./uninstall.sh` removes the entry.
+## Installing
+
+```bash
+./build-deb-install.sh
+sudo apt install ./dist/start-menu_0.1.0_all.deb
+```
+
+`build-deb-install.sh` builds `dist/start-menu_<version>_all.deb`, which any Debian-based distribution can install if its repositories carry `python3-pyqt6` and Python 3.11 or newer. It installs:
+
+| Path | What it is |
+|---|---|
+| `/usr/bin/start-menu` | The launcher. |
+| `/usr/lib/start-menu/` | The `start_menu` package, a copy of `windowchrome`, `menu.yaml` and `start-menu.png`. |
+| `/usr/share/applications/start-menu.desktop` | The application-menu entry. |
+
+The desktop entry names no menu file, because one entry serves every user on the machine: each gets their own `~/.config/start-menu/menu.yaml`, copied from the example the first time they run it. Running `start-menu /path/to/other.yaml` from a terminal still overrides that.
+
+PyQt6 and PyYAML aren't bundled. The package depends on the distribution's own `python3-pyqt6` and `python3-yaml`, which `apt` installs along with it, and `uv` isn't needed at all. A terminal emulator (for the `terminal` and `hold` launch modes) and `tmux` (for `tmux` mode) are only recommended and suggested, not required — each mode explains itself in a dialog if what it needs is missing.
+
+Building needs only `dpkg-deb`, which every Debian system has, and the `windowchrome` sibling checkout described above, whose source is copied into the package. The version comes from `pyproject.toml`. The package's Maintainer field comes from your `git config user.name` and `user.email`; override it with `START_MENU_MAINTAINER="Name <email>"`.
+
+When installing from inside your home folder, `apt` may end with this notice:
+
+```
+N: Download is performed unsandboxed as root as file '.../start-menu_0.1.0_all.deb' couldn't be accessed by user '_apt'. - pkgAcquire::Run (13: Permission denied)
+```
+
+It's harmless, and the package still installs normally. `apt` usually reads package files as its unprivileged `_apt` user, and Ubuntu home folders are private by default, so `apt` read the file as root instead. To avoid the notice, copy the `.deb` somewhere world-readable first, such as `/tmp`, and install it from there.
+
+Remove the package with `sudo apt remove start-menu`. Your `~/.config/start-menu` is untouched.
+
+The package is the only way to install Start Menu. To run it from this checkout instead — while working on it, say — use `./start.sh` directly; there is nothing to install for that.
 
 ## Example menu
 
@@ -45,7 +77,7 @@ If it is missing, `./start.sh` fails immediately with an unresolved path depende
 ./start.sh menu.yaml
 ```
 
-It's meant to be read as much as run: an "Applications" section of `file:` items (`launch: detached`) launching Firefox, Files, Terminal and Calculator, and a "Shell Script Examples" section of `sh:` snippets (`launch: hold`) that print system and network info, plus an `options.editor` setting. Turn on **Edit** (or press `e` to open the file itself) to see how each piece maps to the reference below, then start replacing the entries with your own — `menu.yaml` isn't read from any fixed location, so point `start.sh` at a copy of it anywhere you like.
+It's meant to be read as much as run: an "Applications" section of `file:` items (`launch: detached`) launching Firefox, Files, Terminal and Calculator, and a "Shell Script Examples" section of `sh:` snippets (`launch: hold`) that print system and network info, plus an `options.editor` setting. Turn on **Edit** (or press `e` to open the file itself) to see how each piece maps to the reference below, then start replacing the entries with your own. It is also what seeds a new `~/.config/start-menu/menu.yaml`, so a first run drops you straight into it — and since no menu is read from any fixed location, you can equally point `start.sh` at a copy anywhere you like.
 
 ## Keys
 
@@ -174,7 +206,8 @@ Missing script files are *not* an error at load time — a path may live on a dr
 
 ```
 start.sh              launcher (uv run python -m start_menu)
-menu.yaml             example menu (see "Example menu" above); point start.sh at your own file instead
+build-deb-install.sh  builds the .deb into dist/
+menu.yaml             example menu (see "Example menu" above), and the seed for a new menu file
 start_menu/
   __main__.py         argparse, QApplication, startup validation
   menu.py             YAML -> MenuNode tree, with validation
