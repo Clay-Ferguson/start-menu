@@ -80,7 +80,7 @@ class MenuNode:
 
         `~` and $VARs are expanded either way, and symlinks are followed once
         the path is absolute. A bare filename — what the "Pick File…" button
-        now produces, splitting the folder out into `cwd:` (see dialogs/) —
+        now produces, splitting the folder out into `cwd:` (see item_dialog.py) —
         only means anything relative to the item's working directory, so it's
         joined with `cwd:` first. A path that's already absolute (or expands
         to one) ignores `cwd:` entirely, the same as before that existed. If

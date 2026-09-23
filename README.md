@@ -34,28 +34,29 @@ projects/
 └── windowchrome/          <- must be a sibling, and named this
 ```
 
-If it is missing, `./start.sh` fails immediately with an unresolved path dependency rather than with anything subtle. The checkout is used in place — `uv` installs it editable, so there is nothing to build and an edit there is live here on the next run.
+If it is missing, `./start.sh` and `./lint.sh` fail immediately with an unresolved path dependency rather than with anything subtle. The checkout is used in place — `uv` installs it editable, so there is nothing to build and an edit there is live here on the next run.
 
 ## Installing
 
 ```bash
-./build-deb-install.sh
+packaging/build-deb.sh
 sudo apt install ./dist/start-menu_0.1.0_all.deb
 ```
 
-`build-deb-install.sh` builds `dist/start-menu_<version>_all.deb`, which any Debian-based distribution can install if its repositories carry `python3-pyqt6` and Python 3.11 or newer. It installs:
+`packaging/build-deb.sh` (runnable from anywhere) builds `dist/start-menu_<version>_all.deb`, which any Debian-based distribution can install if its repositories carry `python3-pyqt6` and Python 3.11 or newer. It installs:
 
 | Path | What it is |
 |---|---|
 | `/usr/bin/start-menu` | The launcher. |
-| `/usr/lib/start-menu/` | The `start_menu` package, a copy of `windowchrome`, `menu.yaml` and `start-menu.png`. |
+| `/usr/lib/start-menu/` | The `start_menu` package (with its `data/`: the example menu and the window icon) and a copy of `windowchrome`. |
 | `/usr/share/applications/start-menu.desktop` | The application-menu entry. |
+| `/usr/share/icons/hicolor/*/apps/start-menu.png` | The icon, at every size from 16 to 128 px. |
 
 The desktop entry names no menu file, because one entry serves every user on the machine: each gets their own `~/.config/start-menu/menu.yaml`, copied from the example the first time they run it. Running `start-menu /path/to/other.yaml` from a terminal still overrides that.
 
 PyQt6 and PyYAML aren't bundled. The package depends on the distribution's own `python3-pyqt6` and `python3-yaml`, which `apt` installs along with it, and `uv` isn't needed at all. A terminal emulator (for the `terminal` and `hold` launch modes) and `tmux` (for `tmux` mode) are only recommended and suggested, not required — each mode explains itself in a dialog if what it needs is missing.
 
-Building needs only `dpkg-deb`, which every Debian system has, and the `windowchrome` sibling checkout described above, whose source is copied into the package. The version comes from `pyproject.toml`. The package's Maintainer field comes from your `git config user.name` and `user.email`; override it with `START_MENU_MAINTAINER="Name <email>"`.
+Building needs only `dpkg-deb`, which every Debian system has, and the `windowchrome` sibling checkout described above, whose source is copied into the package. The version comes from `pyproject.toml`. Before packing, the script smoke-tests what it staged — every import resolves, the example menu loads without errors, the modules import — so a file left out fails the build rather than the first launch. The package's Maintainer field comes from your `git config user.name` and `user.email`; override it with `START_MENU_MAINTAINER="Name <email>"`.
 
 When installing from inside your home folder, `apt` may end with this notice:
 
@@ -71,10 +72,11 @@ The package is the only way to install Start Menu. To run it from this checkout 
 
 ## Example menu
 
-`menu.yaml`, checked into the repo, is a ready-to-run example rather than anyone's real menu — every entry only uses applications and commands that ship on a standard Ubuntu Desktop install, so it runs as-is:
+`start_menu/data/example-menu.yaml`, checked into the repo, is a ready-to-run example rather than anyone's real menu — every entry only uses applications and commands that ship on a standard Ubuntu Desktop install, so it runs as-is. Start Menu writes to the file it's given when you edit through the GUI, so try it on a copy:
 
 ```bash
-./start.sh menu.yaml
+cp start_menu/data/example-menu.yaml /tmp/example.yaml
+./start.sh /tmp/example.yaml
 ```
 
 It's meant to be read as much as run: an "Applications" section of `file:` items (`launch: detached`) launching Firefox, Files, Terminal and Calculator, and a "Shell Script Examples" section of `sh:` snippets (`launch: hold`) that print system and network info, plus an `options.editor` setting. Turn on **Edit** (or press `e` to open the file itself) to see how each piece maps to the reference below, then start replacing the entries with your own. It is also what seeds a new `~/.config/start-menu/menu.yaml`, so a first run drops you straight into it — and since no menu is read from any fixed location, you can equally point `start.sh` at a copy anywhere you like.
@@ -87,7 +89,7 @@ It's meant to be read as much as run: an "Applications" section of `file:` items
 | `→` | Open the highlighted section (no-op on a script) |
 | `←` | Back up one level, landing the highlight on the section you came out of |
 | `⏎` | Launch the highlighted script, or open the highlighted section |
-| `e` | Open `menu.yaml` itself in your editor |
+| `e` | Open the menu file itself in your editor |
 | `Esc` / `q` | Quit |
 
 The mouse works too: double-click a row to launch or open it, and click the back arrow in the header to go up a level.
@@ -145,7 +147,7 @@ menu:
 | `file` | script | one of | Path to a shell script. `~` and `$VARS` are expanded and symlinks resolved |
 | `sh` | script | `file`/`sh` | Shell commands written inline, one line or many |
 | `launch` | script | no | How to run it (see below). Default `terminal` |
-| `cwd` | script | yes | Working directory to run in. `~` and `$VARS` are expanded. There is no default — an item with no `cwd:`, or one pointing at a folder that no longer exists, fails with a dialog when you try to launch it, rather than at startup |
+| `cwd` | script | yes | Working directory to run in. `~` and `$VARS` are expanded; `cwd: ~` on its own means your home folder. There is no default — an item with no `cwd:`, or one pointing at a folder that no longer exists, fails with a dialog when you try to launch it, rather than at startup |
 | `tmux_session` | script | with `launch: tmux` | Name of the tmux session to create or reattach to. Letters, digits, `_` and `-` only (see [Tmux sessions](#tmux-sessions)). Like `cwd:`, a missing or malformed one is reported when you launch, not at startup |
 | `icon` | all | no | An icon theme name (`utilities-terminal`) or a path to an image file. Defaults to a folder icon for sections, a file icon for scripts |
 
@@ -202,18 +204,34 @@ Any of them is fatal: fix the file and restart Start Menu. There is no reload �
 
 Missing script files are *not* an error at load time — a path may live on a drive that isn't mounted yet. You get a dialog if you try to launch one.
 
+## Lint
+
+```bash
+./lint.sh
+```
+
+Runs ruff (`ruff.toml`), pyright over the `start_menu` package (`pyrightconfig.json`) and a syntax check of the shell scripts. The tools are fetched by `uv` on demand, so there is nothing to install first.
+
 ## Layout
 
 ```
 start.sh              launcher (uv run python -m start_menu)
-build-deb-install.sh  builds the .deb into dist/
-menu.yaml             example menu (see "Example menu" above), and the seed for a new menu file
+lint.sh               static checks: ruff, pyright, bash -n
+packaging/
+  build-deb.sh        builds the .deb into dist/
+  start-menu.desktop  the desktop entry template
+  icons/              source.png, make-icons.py and the hicolor PNGs it generates
 start_menu/
-  __main__.py         argparse, QApplication, startup validation
-  menu.py             YAML -> MenuNode tree, with validation
-  launcher.py         the four launch modes
-  window.py           MenuTreeView (the navigation) + MainWindow
-  dialogs/            the editing dialogs, over a shared style.py
+  __main__.py         argparse, QApplication, startup validation, error hook
+  menu.py             YAML -> MenuNode tree, with validation, and the tree edits
+  launcher.py         the four launch modes, and opening a file in the editor
+  window.py           MainWindow: header, toolbar, footer, every edit and save
+  tree.py             MenuTreeView: the one-level-at-a-time menu itself
+  icons.py            where icons come from, and making them the size asked for
+  style.py            shared colors and dialog field styling
+  folder_dialog.py    naming a folder
+  item_dialog.py      editing a launchable item
+  data/               example-menu.yaml (seeds a new menu file) and the window icon
 ```
 
 The tree is a real `QTreeView` over a `QStandardItemModel`; showing one level at a time is `setRootIndex()` rather than expanding, which is why per-item icons and everything else native comes for free.

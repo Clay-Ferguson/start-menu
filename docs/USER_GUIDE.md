@@ -199,6 +199,10 @@ Which editor opens is controlled by the menu file's `options.editor` setting (se
 
 The Start Menu window stays open while you edit, but it does **not** automatically notice your changes — edits made this way take effect the next time Start Menu is started, not immediately. (Edits made through the GUI's own dialogs, by contrast, take effect right away, since Start Menu made them itself and reloads the file after saving.)
 
+If you edit the file this way and then, in the same session, make a change through the GUI, Start Menu notices the file has changed underneath it. Rather than overwrite your edit, it leaves the file alone, says so, and reloads the menu from the file — make the GUI change again and it will save normally.
+
+Note that saving from the GUI rewrites the whole file, so any comments you have written in it are dropped the first time you make a change through Edit mode.
+
 ## Icons
 
 Every row shows an icon: a folder icon by default for folders, a generic file icon by default for launchable items. You can give an item or folder its own icon by setting `icon:` in the menu file — either the name of an icon from your desktop's icon theme (e.g. `utilities-terminal`) or a path to an image file. There's no GUI control for this yet; it's set by editing the menu file directly (see below).
