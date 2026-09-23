@@ -12,8 +12,16 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 from . import APP_NAME
-from .menu import LAUNCH_HOLD, MenuError, MenuNode, Options, dump_menu, load_menu
-from .window import MainWindow, format_errors
+from .menu import (
+    LAUNCH_HOLD,
+    MenuError,
+    MenuNode,
+    Options,
+    dump_menu,
+    format_errors,
+    load_menu,
+)
+from .window import MainWindow
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 ICON = os.path.join(PROJECT_ROOT, "start-menu.png")

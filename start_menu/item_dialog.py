@@ -30,16 +30,19 @@ from PyQt6.QtWidgets import (
 )
 from windowchrome import apply_radios, apply_scrollbars
 
-from .. import UI_POINT_SIZE
-from ..menu import (
+from . import UI_POINT_SIZE
+from .launcher import open_in_editor
+from .menu import (
     DEFAULT_LAUNCH,
     LAUNCH_DETACHED,
     LAUNCH_HOLD,
     LAUNCH_MODES,
     LAUNCH_TERMINAL,
     LAUNCH_TMUX,
+    TMUX_SESSION_CHARS,
+    MenuNode,
+    resolve_file,
 )
-from ..utils import open_in_editor
 from .style import (
     BUTTON_STYLE,
     LABEL_STYLE,
@@ -58,8 +61,9 @@ LAUNCH_LABELS = {
 }
 
 # Same restriction launcher.py enforces on a hand-edited menu file; here it
-# stops the offending characters being typed in the first place.
-TMUX_SESSION_PATTERN = r"[A-Za-z0-9_-]*"
+# stops the offending characters being typed in the first place. `*` rather
+# than `+`, so the field can be emptied while typing; Save checks it's filled.
+TMUX_SESSION_PATTERN = f"[{TMUX_SESSION_CHARS}]*"
 
 # The sh editor is sized to comfortably show a script this big without
 # scrolling; longer scripts just scroll normally.
@@ -78,7 +82,9 @@ class ItemEditDialog(QDialog):
     ('name:') entry.
 
     Reused for editing an existing item and creating a new one — same as
-    `FolderNameDialog`, the `title` decides which. A radio pair picks whether
+    `FolderNameDialog`, the `title` decides which. It is handed the item as a
+    MenuNode (None for a new one) and `edited_item()` hands back a new MenuNode,
+    so a field added to MenuNode is added here and nowhere in between. A radio pair picks whether
     the item runs a `file:` on disk or an inline `sh:` snippet; only the
     matching editor for that choice is shown, swapped via a QStackedWidget.
     The working directory (`cwd:`) is required and applies to both kinds, so
@@ -87,12 +93,7 @@ class ItemEditDialog(QDialog):
 
     def __init__(
         self,
-        name: str = "",
-        file: str | None = None,
-        sh: str | None = None,
-        launch: str = DEFAULT_LAUNCH,
-        cwd: str | None = None,
-        tmux_session: str | None = None,
+        node: MenuNode | None = None,
         parent: QWidget | None = None,
         title: str = "Edit Item",
         editor: str = "",
@@ -102,6 +103,14 @@ class ItemEditDialog(QDialog):
         self.setModal(True)
         self.resize(680, 700)
         self._editor = editor
+
+        if node is None:
+            node = MenuNode(name="", launch=DEFAULT_LAUNCH)
+        name, file, sh = node.name, node.file, node.sh
+        launch, cwd, tmux_session = node.launch, node.cwd, node.tmux_session
+        # Not editable here, but it belongs to the item and must survive an
+        # edit: `edited_item()` builds a new node, so it's carried over by hand.
+        self._icon = node.icon
 
         name_label = QLabel("Name:")
         name_label.setStyleSheet(LABEL_STYLE)
@@ -319,15 +328,12 @@ class ItemEditDialog(QDialog):
         path = self._file_edit.text().strip()
         if not path:
             return
-        # Resolved the same way menu.py's `resolved_file` does it, since what's
+        # Resolved by the same `resolve_file` a saved item's path goes through
+        # at launch (menu.py), since what's
         # in the field is usually a bare file name that "Pick File…" split off
         # into `file:` + `cwd:` — on its own it names nothing on disk, and the
         # editor would be pointed at a directory-less path.
-        resolved = os.path.expanduser(os.path.expandvars(path))
-        if not os.path.isabs(resolved):
-            cwd = self._cwd_edit.text().strip()
-            if cwd:
-                resolved = os.path.join(os.path.expanduser(os.path.expandvars(cwd)), resolved)
+        resolved = resolve_file(path, self._cwd_edit.text().strip() or None)
         error = open_in_editor(resolved, self._editor)
         if error:
             QMessageBox.critical(self, "Cannot edit file", error)
@@ -339,7 +345,10 @@ class ItemEditDialog(QDialog):
         # that mode is the one selected.
         name_ok = bool(self._name_edit.text().strip())
         file_ok = bool(self._file_edit.text().strip())
-        content_ok = bool(self._sh_edit.toPlainText().strip()) if self._sh_radio.isChecked() else file_ok
+        if self._sh_radio.isChecked():
+            content_ok = bool(self._sh_edit.toPlainText().strip())
+        else:
+            content_ok = file_ok
         cwd_ok = bool(self._cwd_edit.text().strip())
         tmux_ok = (
             bool(self._tmux_edit.text().strip())
@@ -350,17 +359,20 @@ class ItemEditDialog(QDialog):
         # Edit only makes sense once there's a path to open.
         self._edit_file_button.setEnabled(file_ok)
 
-    def results(self) -> tuple[str, str | None, str | None, str, str, str | None]:
-        """The fields as `(name, file, sh, launch, cwd, tmux_session)`, for a MenuNode.
+    def edited_item(self) -> MenuNode:
+        """The item as the fields now describe it, as a new MenuNode.
 
         The session name comes back whatever the launch mode is, so switching
         the mode away from tmux and back doesn't quietly discard what was
         typed; only whether it's *required* depends on the mode (`_validate`).
         """
-        name = self._name_edit.text().strip()
-        launch = self._launch_combo.currentData()
-        cwd = self._cwd_edit.text().strip()
-        tmux_session = self._tmux_edit.text().strip() or None
-        if self._sh_radio.isChecked():
-            return name, None, self._sh_edit.toPlainText(), launch, cwd, tmux_session
-        return name, self._file_edit.text().strip(), None, launch, cwd, tmux_session
+        is_sh = self._sh_radio.isChecked()
+        return MenuNode(
+            name=self._name_edit.text().strip(),
+            icon=self._icon,
+            file=None if is_sh else self._file_edit.text().strip(),
+            sh=self._sh_edit.toPlainText() if is_sh else None,
+            launch=self._launch_combo.currentData(),
+            cwd=self._cwd_edit.text().strip(),
+            tmux_session=self._tmux_edit.text().strip() or None,
+        )

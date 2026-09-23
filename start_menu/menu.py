@@ -29,6 +29,14 @@ SCRIPT_KEYS = {"name", "icon", "file", "sh", "launch", "cwd", "tmux_session"}
 OPTION_KEYS = {"editor"}
 TOP_LEVEL_KEYS = {"menu", "options"}
 
+# The characters a `tmux_session:` may use, as a regex character class.
+# Stricter than tmux itself requires: tmux addresses panes as
+# `session:window.pane`, so a ':' or '.' inside the *session* name would make
+# every `-t` target aim at some other window or pane instead. launcher.py
+# enforces it on whatever the file says; the item dialog stops the other
+# characters being typed at all.
+TMUX_SESSION_CHARS = "A-Za-z0-9_-"
+
 
 @dataclass
 class Options:
@@ -81,12 +89,7 @@ class MenuNode:
         """
         if self.file is None:
             return None
-        expanded = os.path.expanduser(os.path.expandvars(self.file))
-        if os.path.isabs(expanded):
-            return os.path.realpath(expanded)
-        if self.cwd:
-            return os.path.realpath(os.path.join(_expand(self.cwd), expanded))
-        return expanded
+        return resolve_file(self.file, self.cwd)
 
     @property
     def resolved_cwd(self) -> str | None:
@@ -103,12 +106,60 @@ class MenuNode:
         return _expand(self.cwd)
 
 
+def resolve_file(file: str, cwd: str | None) -> str:
+    """A `file:` value as the path it names; see `MenuNode.resolved_file`.
+
+    A function of its own, rather than only the property, so the item dialog
+    can resolve what is typed into its fields before any MenuNode exists.
+    """
+    expanded = os.path.expanduser(os.path.expandvars(file))
+    if os.path.isabs(expanded):
+        return os.path.realpath(expanded)
+    if cwd:
+        return os.path.realpath(os.path.join(_expand(cwd), expanded))
+    return expanded
+
+
 def _expand(path: str) -> str:
     return os.path.realpath(os.path.expanduser(os.path.expandvars(path)))
 
 
+def nodes_at(nodes: list[MenuNode], rows: list[int]) -> list[MenuNode]:
+    """The list of nodes reached by following `rows` down from `nodes`.
+
+    `rows` is a path of row numbers, outermost first, each naming a section
+    in the level above it; an empty path is the top level itself. The list
+    returned is the live one inside the tree, so changing it edits the menu.
+    """
+    for row in rows:
+        nodes = nodes[row].children
+    return nodes
+
+
+def detach_node(nodes: list[MenuNode], target: MenuNode) -> bool:
+    """Remove `target` from `nodes` or any section under it. True if found.
+
+    Identity, not equality: MenuNode is a dataclass, so two items that happen
+    to carry the same fields compare equal and `list.remove` would drop the
+    wrong one.
+    """
+    for i, node in enumerate(nodes):
+        if node is target:
+            del nodes[i]
+            return True
+        if node.is_section and detach_node(node.children, target):
+            return True
+    return False
+
+
 class MenuError(Exception):
     """A menu file that could not be read or parsed at all."""
+
+
+def format_errors(menu_path: str, errors: list[str]) -> str:
+    """`load_menu`'s validation errors as one message, for a dialog."""
+    lines = "\n".join(f"  • {e}" for e in errors)
+    return f"{menu_path} has {len(errors)} problem(s):\n\n{lines}"
 
 
 def load_menu(path: str) -> tuple[list[MenuNode], Options, list[str]]:
@@ -221,7 +272,9 @@ def _parse_node(raw, where: str, errors: list[str]) -> MenuNode | None:
     allowed = SECTION_KEYS if has_items else SCRIPT_KEYS
     for key in sorted(set(raw) - allowed):
         kind = "section" if has_items else "script"
-        errors.append(f"{label}: '{key}:' is not valid on a {kind}; allowed keys are {_join(allowed)}.")
+        errors.append(
+            f"{label}: '{key}:' is not valid on a {kind}; allowed keys are {_join(allowed)}."
+        )
 
     if has_items:
         # Unlike the top-level menu, a section is allowed to be empty — that's
@@ -252,7 +305,14 @@ def _parse_node(raw, where: str, errors: list[str]) -> MenuNode | None:
         launch = DEFAULT_LAUNCH
 
     cwd = raw.get("cwd")
-    if cwd is not None and not isinstance(cwd, str):
+    if "cwd" in raw and cwd is None:
+        # A bare `~` is YAML for null, not for the home directory — so the
+        # `cwd: ~` this app's own docs and example menu use would otherwise
+        # read as "no working directory", and every such item would refuse to
+        # launch. Present-but-null can only have meant home. (Saving writes it
+        # back quoted, as '~', which YAML reads as the string.)
+        cwd = "~"
+    elif cwd is not None and not isinstance(cwd, str):
         errors.append(f"{label}: 'cwd:' must be text, got {_kind(cwd)}.")
         cwd = None
 

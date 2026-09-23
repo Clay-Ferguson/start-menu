@@ -23,14 +23,12 @@ import subprocess
 import time
 from typing import Callable
 
-from .menu import LAUNCH_DETACHED, LAUNCH_HOLD, LAUNCH_TMUX, MenuNode
+from .menu import LAUNCH_DETACHED, LAUNCH_HOLD, LAUNCH_TMUX, TMUX_SESSION_CHARS, MenuNode
 
 TERMINALS = ("gnome-terminal", "konsole", "xfce4-terminal", "x-terminal-emulator", "xterm")
 
-# Stricter than tmux itself requires. tmux addresses panes as
-# `session:window.pane`, so a ':' or '.' inside the *session* name makes every
-# `-t` below aim at some other window or pane instead of the session.
-TMUX_SESSION_RE = re.compile(r"[A-Za-z0-9_-]+")
+# A usable session name; see TMUX_SESSION_CHARS for why it is this strict.
+TMUX_SESSION_RE = re.compile(f"[{TMUX_SESSION_CHARS}]+")
 
 # Shown in the tmux status bar, since the way out of an attached session is
 # the one thing about this mode that isn't guessable.
@@ -140,6 +138,36 @@ def launch(
     except OSError as exc:
         return f"Cannot launch '{node.name}':\n\n{exc}"
     return None
+
+
+def open_in_editor(path: str, editor: str) -> str | None:
+    """Open `path` in `editor`. Returns an error message, or None on success.
+
+    Shared by the "e" shortcut that opens the whole menu file (window.py) and
+    the "Edit" button beside a script item's file path (item_dialog.py).
+    Routed through launch() as a detached inline snippet, so the editor is
+    spawned exactly the way a `launch: detached` menu item would be — its own
+    session, surviving Start Menu. `editor` is shell text, so it may carry
+    arguments of its own.
+    """
+    binary = shlex.split(editor)[0] if editor.strip() else ""
+    if not binary or not shutil.which(binary):
+        return (
+            f"Cannot open '{path}':\n\n"
+            f"The editor '{binary or editor}' was not found on PATH.\n\n"
+            f"Set 'editor:' under 'options:' in the menu file to one you have."
+        )
+    # abspath first: a bare name ("menu.yaml") has an empty dirname, and launch()
+    # treats an empty cwd as "no working directory is set" and refuses to run —
+    # an error about the folder, for what is really just an unqualified path.
+    path = os.path.abspath(path)
+    node = MenuNode(
+        name=os.path.basename(path),
+        sh=f"{editor} {shlex.quote(path)}",
+        launch=LAUNCH_DETACHED,
+        cwd=os.path.dirname(path),
+    )
+    return launch(node)
 
 
 def build_command(node: MenuNode) -> str:

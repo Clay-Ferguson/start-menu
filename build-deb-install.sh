@@ -14,7 +14,7 @@
 #
 # Installed layout:
 #   /usr/bin/start-menu                         launcher
-#   /usr/lib/start-menu/start_menu/             the app, including dialogs/
+#   /usr/lib/start-menu/start_menu/             the app
 #   /usr/lib/start-menu/windowchrome/           copy of ../windowchrome
 #   /usr/lib/start-menu/menu.yaml               example menu   } found through
 #   /usr/lib/start-menu/start-menu.png          window icon    } __main__.PROJECT_ROOT
@@ -66,7 +66,7 @@ rm -rf "$STAGE" "$DEB"
 # -- files -------------------------------------------------------------------
 
 install -d -m 755 \
-  "$LIB/start_menu" "$LIB/start_menu/dialogs" "$LIB/windowchrome" \
+  "$LIB/start_menu" "$LIB/windowchrome" \
   "$STAGE/usr/bin" \
   "$STAGE/usr/share/applications" \
   "$STAGE/usr/share/pixmaps" \
@@ -77,7 +77,6 @@ install -d -m 755 \
 # windowchrome) needs another line here or it silently won't ship.
 # __pycache__ is left behind on purpose and compiled fresh by postinst.
 install -m 644 "$HERE"/start_menu/*.py "$LIB/start_menu/"
-install -m 644 "$HERE"/start_menu/dialogs/*.py "$LIB/start_menu/dialogs/"
 install -m 644 "$WINDOWCHROME"/*.py "$LIB/windowchrome/"
 
 # menu.yaml is the example, which __main__.EXAMPLE_MENU copies to

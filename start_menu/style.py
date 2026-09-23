@@ -1,8 +1,8 @@
-"""Styling shared by the editing dialogs.
+"""The app's shared look: the selection colors and the dialogs' field styling.
 
-Kept in its own module because the dialogs share the same lightened input
-fields and button/label sizing; anything only one of them needs lives in
-that dialog's own module instead.
+Anything used by more than one module lives here, so a dialog never has to
+import `window` or `tree` just for a color. Styling only one module needs
+stays in that module. Imports nothing from the package except `UI_POINT_SIZE`.
 """
 
 from __future__ import annotations
@@ -10,14 +10,19 @@ from __future__ import annotations
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QApplication
 
-from .. import UI_POINT_SIZE
+from . import UI_POINT_SIZE
 
-# The folder-name dialog is small enough that its outer edge is easy to lose
-# against the desktop behind it, so its content sits inside a bordered QFrame
-# — a QDialog won't reliably paint a stylesheet border of its own, but a
-# QFrame always will. ItemEditDialog deliberately has none: it is big enough
-# that the decoration's own frame is edge enough.
-BORDER_STYLE = "#dialogFrame { border: 1px solid #a0a0a0; border-radius: 6px; }"
+# The desktop's own highlight color (Ubuntu's #E95420) is loud for something
+# you stare at while hunting a menu, so the selection bar is pinned to a
+# darker, less saturated orange instead of following the system accent.
+HIGHLIGHT_BG = "#9e4b2e"
+HIGHLIGHT_FG = "#ffffff"
+# A wash of the same orange, for the row under the mouse. The rows are given
+# an explicit background (see `MenuTreeView._stylesheet`), which costs them
+# the hover the native style would otherwise have drawn, so it is drawn here
+# instead.
+HOVER_BG = "rgba(158, 75, 46, 56)"
+
 LABEL_STYLE = f"font-size: {UI_POINT_SIZE}pt;"
 BUTTON_STYLE = f"QPushButton {{ font-size: {UI_POINT_SIZE}pt; padding: 8px 20px; }}"
 
@@ -74,4 +79,3 @@ def field_style() -> str:
         f" background-color: {field_background().name()};"
         f" border: 1px solid {field_border()};"
     )
-

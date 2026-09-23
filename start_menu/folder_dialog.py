@@ -12,7 +12,14 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from .style import BORDER_STYLE, BUTTON_STYLE, LABEL_STYLE, field_style
+from .style import BUTTON_STYLE, LABEL_STYLE, field_style
+
+# This dialog is small enough that its outer edge is easy to lose against the
+# desktop behind it, so its content sits inside a bordered QFrame — a QDialog
+# won't reliably paint a stylesheet border of its own, but a QFrame always
+# will. ItemEditDialog deliberately has none: it is big enough that the
+# decoration's own frame is edge enough.
+BORDER_STYLE = "#dialogFrame { border: 1px solid #a0a0a0; border-radius: 6px; }"
 
 
 class FolderNameDialog(QDialog):
@@ -22,7 +29,9 @@ class FolderNameDialog(QDialog):
     `title` decides which, since the field itself is identical either way.
     """
 
-    def __init__(self, current_name: str, parent: QWidget | None = None, title: str = "Rename") -> None:
+    def __init__(
+        self, current_name: str, parent: QWidget | None = None, title: str = "Rename"
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
