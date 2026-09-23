@@ -1,10 +1,10 @@
-# Template only. build-deb-install.sh rewrites Exec= and Icon= for where it is
-# installing to, so the paths below are never used.
+# Template only. packaging/build-deb.sh rewrites Exec= and Icon= for where it is
+# installing to, so the path below is never used.
 [Desktop Entry]
 Name=Start Menu
 Comment=Launch scripts via an arrow-key menu
 Exec=/path/to/start-menu/start.sh
-Icon=/path/to/start-menu/start-menu.png
+Icon=start-menu
 Terminal=false
 Type=Application
 Categories=Utility;

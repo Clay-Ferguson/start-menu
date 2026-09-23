@@ -23,8 +23,14 @@ from .menu import (
 )
 from .window import MainWindow
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-ICON = os.path.join(PROJECT_ROOT, "start-menu.png")
+# Files the program reads at run time, kept inside the package so they travel
+# with it — the same place in a checkout and under /usr/lib/start-menu, with
+# nothing for the .deb to copy separately.
+DATA_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data")
+
+# The window's own icon. An installed copy also gets its dock icon from the
+# themed icons the .deb installs; a checkout run has only this.
+ICON = os.path.join(DATA_DIR, "start-menu.png")
 
 # Where the menu lives when no path is given on the command line. A system-wide
 # install (the .deb) puts one desktop entry in front of every user on the
@@ -32,11 +38,8 @@ ICON = os.path.join(PROJECT_ROOT, "start-menu.png")
 # it launches, and what makes the packaged entry work for a stranger.
 DEFAULT_MENU = os.path.expanduser("~/.config/start-menu/menu.yaml")
 
-# The example menu, shipped beside the package: <checkout>/menu.yaml from a git
-# checkout, /usr/lib/start-menu/menu.yaml from the .deb. Found through
-# PROJECT_ROOT exactly as ICON is, and for the same reason neither file may be
-# moved out from beside the package directory.
-EXAMPLE_MENU = os.path.join(PROJECT_ROOT, "menu.yaml")
+# The example menu, which seeds a menu file that doesn't exist yet.
+EXAMPLE_MENU = os.path.join(DATA_DIR, "example-menu.yaml")
 
 STARTER_ITEM_NAME = "Example"
 
@@ -53,7 +56,7 @@ def _create_menu_file(path: str) -> None:
     copied byte for byte rather than round-tripped through load_menu/dump_menu,
     which would drop the comments that are most of its value.
 
-    The fallback, for a checkout whose example has been deleted, is a single
+    The fallback, for an install whose example has gone missing, is a single
     harmless item: the top-level menu can't be empty (load_menu rejects that),
     so there has to be something.
     """

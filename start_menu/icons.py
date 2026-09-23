@@ -27,14 +27,15 @@ def edit_icon(size: int) -> QIcon:
     return _glyph_icon("✎", size)
 
 
-def back_icon(style: QStyle, size: int) -> QIcon:
+def back_icon(style: QStyle | None, size: int) -> QIcon:
     """A left-pointing arrow for the header's "go up a level" button."""
     icon = QIcon.fromTheme("go-previous")
     if not icon.isNull():
         return icon
-    icon = style.standardIcon(QStyle.StandardPixmap.SP_ArrowBack)
-    if not icon.isNull():
-        return icon
+    if style is not None:
+        icon = style.standardIcon(QStyle.StandardPixmap.SP_ArrowBack)
+        if not icon.isNull():
+            return icon
     return _glyph_icon("←", size)
 
 

@@ -82,8 +82,9 @@ def launch(
     if not os.path.isdir(cwd):
         return f"Cannot launch '{node.name}':\n\nWorking directory does not exist:\n{cwd}"
 
-    if node.file is not None and not os.path.isfile(node.resolved_file):
-        return f"Cannot launch '{node.name}':\n\n{node.resolved_file}\n\nNo such file."
+    path = node.resolved_file
+    if path is not None and not os.path.isfile(path):
+        return f"Cannot launch '{node.name}':\n\n{path}\n\nNo such file."
 
     if node.launch == LAUNCH_TMUX:
         session = (node.tmux_session or "").strip()
@@ -183,7 +184,10 @@ def build_command(node: MenuNode) -> str:
     directly in the window.
     """
     hold = node.launch == LAUNCH_HOLD
-    cd = f"cd {shlex.quote(node.resolved_cwd)} || exit 1"
+    cwd = node.resolved_cwd
+    if cwd is None:
+        raise ValueError(f"'{node.name}' has no working directory")  # launch() checks first
+    cd = f"cd {shlex.quote(cwd)} || exit 1"
 
     if node.sh is not None:
         label = node.name
@@ -199,6 +203,8 @@ def build_command(node: MenuNode) -> str:
             lines = [cd, body]
     else:
         path = node.resolved_file
+        if path is None:
+            raise ValueError(f"'{node.name}' is a section, not a script")
         label = os.path.basename(path)
         # A script without the execute bit still runs, just under an explicit bash.
         runner = shlex.quote(path)
@@ -271,9 +277,10 @@ def _build_tmux_wrapper(node: MenuNode, inner: str) -> str:
     )
     # "Run it directly to see why" only means something when there's a file to
     # run; an inline snippet has no such thing.
+    script = node.resolved_file
     retry_hint = (
-        "Run " + node.resolved_file + " directly to see why."
-        if node.file is not None
+        "Run " + script + " directly to see why."
+        if script is not None
         else "Check this item's commands for something that exits straight away."
     )
     died_msg = shlex.quote(

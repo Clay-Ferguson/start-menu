@@ -224,7 +224,9 @@ class MenuTreeView(QTreeView):
         user as well.
         """
         model = QStandardItemModel(self)
-        self._populate(model.invisibleRootItem(), nodes)
+        root = model.invisibleRootItem()
+        assert root is not None  # a model always has one; the stubs say Optional
+        self._populate(root, nodes)
         self.setModel(model)
         # A rebuild replaces every MenuNode object, so a pending cut can't
         # outlive it (MainWindow drops the cut before getting here); start the
@@ -494,7 +496,7 @@ def _tooltip(node: MenuNode) -> str:
             lines = lines[:TOOLTIP_LINES] + [f"… {len(lines) - TOOLTIP_LINES} more lines"]
         text = "\n".join(lines)
     else:
-        text = node.resolved_file
+        text = node.resolved_file or ""
     if node.launch == LAUNCH_TMUX and node.tmux_session:
         # Which session an item attaches to isn't visible anywhere else, and
         # two items can deliberately share one, so it's worth a line here.

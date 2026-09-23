@@ -345,7 +345,7 @@ class _MenuDumper(yaml.SafeDumper):
     """
 
 
-def _represent_str(dumper: yaml.Dumper, data: str):
+def _represent_str(dumper: yaml.SafeDumper, data: str) -> yaml.ScalarNode:
     style = "|" if "\n" in data else None
     return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=style)
 

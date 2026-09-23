@@ -157,7 +157,7 @@ class MainWindow(QWidget):
         # letter keys (its type-ahead search), so "q" would never reach us here.
         for keys, slot in ((("Esc", "Q"), self.close), (("E",), self.edit_menu)):
             for key in keys:
-                QShortcut(QKeySequence(key), self, activated=slot)
+                QShortcut(QKeySequence(key), self).activated.connect(slot)
 
         self.tree.set_nodes(nodes)
         self.tree.setFocus()
