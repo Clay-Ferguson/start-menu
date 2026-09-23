@@ -38,7 +38,7 @@ from windowchrome import ToggleSwitch, apply_scrollbars
 from . import APP_NAME, UI_POINT_SIZE
 from .dialogs import FolderNameDialog, ItemEditDialog
 from .launcher import TMUX_ATTACH, TMUX_CANCEL, TMUX_RESTART, launch
-from .menu import LAUNCH_TMUX, MenuNode, Options, dump_menu, load_menu
+from .menu import LAUNCH_TMUX, MenuError, MenuNode, Options, dump_menu, load_menu
 from .utils import open_in_editor
 
 NODE_ROLE = Qt.ItemDataRole.UserRole
@@ -327,7 +327,10 @@ class MenuTreeView(QTreeView):
         instead of always the first row. Both are names rather than row
         numbers because an edit can renumber the rows underneath them: a move
         reorders a level, and a paste empties rows out of the level it cut
-        from, which would shift the folder we're standing in.
+        from, which would shift the folder we're standing in. The price is
+        that when two siblings share a name, the first of them is the one
+        found — accepted, since a menu with twin names is ambiguous to the
+        user as well.
         """
         model = QStandardItemModel(self)
         self._populate(model.invisibleRootItem(), nodes)
@@ -446,16 +449,30 @@ class MenuTreeView(QTreeView):
         """Which action icons apply to `index`'s row, and each one's slot.
 
         The first item in a level has no "up" and the last has no "down" —
-        there's nowhere for either to go.
+        there's nowhere for either to go. "First" and "last" are among the
+        rows on screen: a row a pending cut is hiding is not a place to move to.
         """
         slots: dict[int, str] = {EDIT_SLOT: "edit", DELETE_SLOT: "delete"}
-        row = index.row()
-        count = self.model().rowCount(index.parent())
-        if row > 0:
+        if self.neighbor_row(index, -1) is not None:
             slots[UP_SLOT] = "up"
-        if row < count - 1:
+        if self.neighbor_row(index, 1) is not None:
             slots[DOWN_SLOT] = "down"
         return slots
+
+    def neighbor_row(self, index: QModelIndex, delta: int) -> int | None:
+        """The nearest visible row above (`delta` -1) or below (+1) `index`.
+
+        Skips rows hidden by a pending cut, which are still in the model (see
+        `set_hidden_nodes`), so a move swaps with the neighbor the user can
+        see rather than with an invisible one. None at the edge of the level.
+        """
+        parent = index.parent()
+        row = index.row() + delta
+        while 0 <= row < self.model().rowCount(parent):
+            if not self.isRowHidden(row, parent):
+                return row
+            row += delta
+        return None
 
     def _populate(self, parent: QStandardItem, nodes: list[MenuNode]) -> None:
         for node in nodes:
@@ -583,6 +600,10 @@ class MainWindow(QWidget):
         self.menu_path = menu_path
         self.nodes = nodes
         self.options = options
+        # When the file on disk was last known to match `self.nodes`, so a save
+        # can tell whether something else — the "e" editor, most likely — has
+        # rewritten it since. See `_save_and_reload`.
+        self._menu_mtime = _mtime(menu_path)
 
         self.setWindowTitle(APP_NAME)
         self.resize(560, 640)
@@ -954,8 +975,8 @@ class MainWindow(QWidget):
         """The row's move up/down icon was clicked; `delta` is -1 or +1."""
         siblings = self._sibling_list(index)
         pos = index.row()
-        new_pos = pos + delta
-        if not (0 <= new_pos < len(siblings)):
+        new_pos = self.tree.neighbor_row(index, delta)
+        if new_pos is None:
             return  # the icon shouldn't have been shown at all; ignore it
         siblings[pos], siblings[new_pos] = siblings[new_pos], siblings[pos]
         self._save_and_reload()
@@ -992,28 +1013,76 @@ class MainWindow(QWidget):
         object, so the cut list would be pointing at nodes that are no longer
         in the tree. It's dropped instead — the cut items reappear where they
         were, which is where they still are on disk.
+
+        Every caller has already changed `self.nodes` by the time this runs,
+        while the view still shows the old rows. So no path out of here may
+        leave the two disagreeing: the view maps rows to nodes by row number,
+        and a mismatch would aim the next edit at the wrong item. Whatever
+        goes wrong, the tree is rebuilt — from disk when the edit was not
+        written, and from `self.nodes` when the file won't load back.
         """
         self._clear_cut()
         path = self.tree.breadcrumb()
         if select_name is None:
             select_name = self.tree.current_selection_name()
+
+        # The file was changed behind our back (the "e" editor, usually).
+        # Saving now would rewrite it from the tree loaded before that edit
+        # and silently throw the edit away, so the file wins instead: this
+        # change is dropped and the window picks up what's on disk.
+        if _mtime(self.menu_path) != self._menu_mtime:
+            QMessageBox.warning(
+                self,
+                f"{APP_NAME} — menu file changed",
+                f"{self.menu_path} was changed outside {APP_NAME}.\n\n"
+                "Your last change was not saved, so as not to overwrite that "
+                "edit. The menu has been reloaded from the file; make the "
+                "change again if you still want it.",
+            )
+            if not self._reload_from_disk(path, select_name):
+                self.tree.set_nodes(self.nodes, restore_path=path, select_name=select_name)
+            return
+
         try:
             dump_menu(self.menu_path, self.nodes, self.options)
         except OSError as exc:
             QMessageBox.critical(
                 self, f"{APP_NAME} — cannot save menu", f"Could not write {self.menu_path}:\n\n{exc}"
             )
+            # The write is atomic, so the file still holds the menu as it was
+            # before this edit; going back to it undoes the in-memory change.
+            if not self._reload_from_disk(path, select_name):
+                self.tree.set_nodes(self.nodes, restore_path=path, select_name=select_name)
             return
 
-        nodes, options, errors = load_menu(self.menu_path)
+        self._menu_mtime = _mtime(self.menu_path)
+        if not self._reload_from_disk(path, select_name):
+            # What we wrote doesn't load back. The file and `self.nodes` agree
+            # with each other, so show that rather than the stale rows. (The
+            # same last resort as above, where the file couldn't be read.)
+            self.tree.set_nodes(self.nodes, restore_path=path, select_name=select_name)
+
+    def _reload_from_disk(self, path: list[str], select_name: str | None) -> bool:
+        """Replace the tree with what `menu_path` holds now. False if it can't.
+
+        Reports its own failures. On one, `self.nodes` and the view are left
+        exactly as they were, for the caller to decide what to show.
+        """
+        try:
+            nodes, options, errors = load_menu(self.menu_path)
+        except MenuError as exc:
+            QMessageBox.critical(self, f"{APP_NAME} — cannot reload menu", str(exc))
+            return False
         if errors:
             QMessageBox.critical(
                 self, f"{APP_NAME} — cannot reload menu", format_errors(self.menu_path, errors)
             )
-            return
+            return False
         self.nodes = nodes
         self.options = options
+        self._menu_mtime = _mtime(self.menu_path)
         self.tree.set_nodes(nodes, restore_path=path, select_name=select_name)
+        return True
 
     def edit_menu(self) -> None:
         """Open the menu file itself in the configured editor.
@@ -1024,6 +1093,14 @@ class MainWindow(QWidget):
         error = open_in_editor(self.menu_path, self.options.resolved_editor())
         if error:
             QMessageBox.critical(self, f"{APP_NAME} — cannot edit menu", error)
+
+
+def _mtime(path: str) -> int | None:
+    """`path`'s modification time in ns, or None if it can't be read."""
+    try:
+        return os.stat(path).st_mtime_ns
+    except OSError:
+        return None
 
 
 def _detach_node(nodes: list[MenuNode], target: MenuNode) -> bool:
@@ -1045,7 +1122,8 @@ def _detach_node(nodes: list[MenuNode], target: MenuNode) -> bool:
 def _tooltip(node: MenuNode) -> str:
     """What the item points at: a path, the snippet itself, or a child count."""
     if node.is_section:
-        return f"{len(node.children)} items"
+        count = len(node.children)
+        return f"{count} item" if count == 1 else f"{count} items"
     if node.sh is not None:
         lines = node.sh.strip().splitlines()
         if len(lines) > TOOLTIP_LINES:

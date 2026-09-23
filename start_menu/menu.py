@@ -10,6 +10,8 @@ so a hand-edited menu file reports all of its mistakes in one pass.
 from __future__ import annotations
 
 import os
+import stat
+import tempfile
 from dataclasses import dataclass, field
 
 import yaml
@@ -324,13 +326,42 @@ def dump_menu(path: str, nodes: list[MenuNode], options: Options) -> None:
     library, so any comments or hand-formatting in the current file are lost
     once this runs. That trade-off was made deliberately to avoid a second
     YAML dependency.
+
+    Written to a temporary file beside the real one and then moved over it
+    with `os.replace`, so a crash or a full disk partway through leaves the
+    old menu intact rather than a truncated one — this file is the user's
+    only copy of their menu. The target is resolved through symlinks first,
+    so a menu.yaml linked in from a dotfiles repo stays a link, and the old
+    file's permissions are carried over to the new one.
     """
     data: dict = {}
     if options.editor:
         data["options"] = {"editor": options.editor}
     data["menu"] = [_node_to_dict(node) for node in nodes]
-    with open(path, "w", encoding="utf-8") as f:
-        yaml.dump(data, f, Dumper=_MenuDumper, sort_keys=False, allow_unicode=True)
+
+    target = os.path.realpath(path)
+    fd, tmp = tempfile.mkstemp(
+        dir=os.path.dirname(target), prefix=".start-menu-", suffix=".tmp"
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            yaml.dump(data, f, Dumper=_MenuDumper, sort_keys=False, allow_unicode=True)
+        try:
+            mode = stat.S_IMODE(os.stat(target).st_mode)
+        except FileNotFoundError:
+            # A brand new file gets what open() would have given it, not
+            # mkstemp's owner-only 0600.
+            umask = os.umask(0)
+            os.umask(umask)
+            mode = 0o666 & ~umask
+        os.chmod(tmp, mode)
+        os.replace(tmp, target)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def _kind(value) -> str:

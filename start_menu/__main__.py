@@ -6,6 +6,7 @@ import argparse
 import os
 import shutil
 import sys
+import traceback
 
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication, QMessageBox
@@ -30,6 +31,9 @@ DEFAULT_MENU = os.path.expanduser("~/.config/start-menu/menu.yaml")
 EXAMPLE_MENU = os.path.join(PROJECT_ROOT, "menu.yaml")
 
 STARTER_ITEM_NAME = "Example"
+
+# How much of a traceback the internal-error dialog shows.
+TRACEBACK_LINES = 12
 
 
 def _create_menu_file(path: str) -> None:
@@ -62,6 +66,31 @@ def _create_menu_file(path: str) -> None:
     dump_menu(path, starter, Options())
 
 
+def _report_unhandled(kind, value, trace) -> None:
+    """Show an exception that escaped a slot, instead of dying of it.
+
+    PyQt6 aborts the whole process when a Python exception leaves a slot and
+    no `sys.excepthook` has been installed — a bug behind one button would
+    close the menu outright, with nothing to show for it when Start Menu was
+    started from a desktop icon. With a hook installed PyQt calls it instead
+    and carries on, so the bug is reported and the window survives.
+    """
+    text = "".join(traceback.format_exception(kind, value, trace))
+    if sys.__stderr__ is not None:
+        sys.__stderr__.write(text)
+    if QApplication.instance() is None:
+        return
+    # The tail of the traceback, where the failing line is: a desktop launch
+    # has no terminal for the stderr copy above to reach.
+    tail = "\n".join(text.rstrip().splitlines()[-TRACEBACK_LINES:])
+    QMessageBox.critical(
+        None,
+        f"{APP_NAME} — internal error",
+        f"Something went wrong inside {APP_NAME}. The window should still "
+        f"work.\n\n{tail}",
+    )
+
+
 def main() -> int:
     # menu_file is optional because there is a default. That is what lets the
     # packaged desktop entry name no file at all: one Exec= line serves every
@@ -78,8 +107,14 @@ def main() -> int:
     args = parser.parse_args()
 
     app = QApplication(sys.argv)
+    sys.excepthook = _report_unhandled
     app.setApplicationName(APP_NAME)
-    app.setApplicationDisplayName(APP_NAME)
+    # applicationDisplayName is deliberately NOT set. Every platform backend
+    # runs window titles through QPlatformWindow::formatWindowTitle(), which
+    # appends the display name to any title that isn't exactly it — so with
+    # it set, "Start Menu — launch failed" reached the title bar as
+    # "Start Menu — launch failed — Start Menu". Each window spells out its
+    # own full title instead.
     # Ties the window to start-menu.desktop, so the desktop shows our icon in
     # the dock and alt-tab instead of a generic one. Without it the Wayland
     # app_id is derived from argv[0] ("python3") and matches nothing.
