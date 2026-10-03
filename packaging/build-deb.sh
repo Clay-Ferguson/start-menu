@@ -3,7 +3,8 @@
 #
 # Usage:  packaging/build-deb.sh             (from anywhere)
 # Output: dist/start-menu_<version>_all.deb  (dist/ at the top of the checkout)
-# Then:   sudo apt install ./dist/start-menu_<version>_all.deb
+# Then:   sudo apt install --reinstall ./dist/start-menu_<version>_all.deb
+#         (--reinstall, or apt skips a rebuild whose version is already installed)
 #
 # Built by hand with dpkg-deb rather than with debhelper: Start Menu is pure
 # Python with no build step, so all the package has to do is put files in the
@@ -132,17 +133,19 @@ chmod 644 "$STAGE/usr/share/applications/start-menu.desktop"
 # -- smoke test ----------------------------------------------------------------
 
 # A file the copy missed installs cleanly and fails on first launch, so the
-# staged tree is checked before it is packed, with the launcher's own flags
-# (-I) plus -B so nothing is written into the stage. Three checks, the first
-# two needing nothing but Python and PyYAML, so they run on a build machine
-# with no Qt:
+# staged tree is checked before it is packed, with the launcher's own
+# interpreter (/usr/bin/python3, not whichever python3 is first on PATH, which
+# in an activated venv or a pyenv/conda/uv shell has no python3-yaml) and its
+# flags (-I) plus -B so nothing is written into the stage. Three checks, the
+# first two needing nothing but Python and PyYAML, so they run on a build
+# machine with no Qt:
 #
 #   - every import inside the staged packages names a file that was staged;
 #   - the example menu is there, and loads with no validation errors;
-#   - the modules import: all of them where the system python3 has PyQt6, and
+#   - the modules import: all of them where /usr/bin/python3 has PyQt6, and
 #     otherwise the Qt-free ones (menu, launcher).
-command -v python3 >/dev/null 2>&1 || die "python3 not found; it is needed to check the staged files."
-python3 -I -B - "$LIB" <<'PY' || die "the staged files failed the smoke test (above); nothing was packaged."
+[ -x /usr/bin/python3 ] || die "/usr/bin/python3 not found; it is needed to check the staged files (apt install python3)."
+/usr/bin/python3 -I -B - "$LIB" <<'PY' || die "the staged files failed the smoke test (above); nothing was packaged."
 import ast
 import importlib
 import pathlib
@@ -297,5 +300,5 @@ rm -rf "$STAGE"
 
 echo "Built $DEB"
 echo ""
-echo "Install:  sudo apt install $DEB"
+echo "Install:  sudo apt install --reinstall $DEB"
 echo "Remove:   sudo apt remove $PACKAGE"

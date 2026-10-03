@@ -40,8 +40,12 @@ If it is missing, `./start.sh` and `./lint.sh` fail immediately with an unresolv
 
 ```bash
 packaging/build-deb.sh
-sudo apt install ./dist/start-menu_0.1.0_all.deb
+sudo apt install --reinstall ./dist/start-menu_0.1.0_all.deb
 ```
+
+Or run `./build.sh`, which does both: it runs `packaging/build-deb.sh`, then asks whether to install the result (default no).
+
+`--reinstall` matters when installing over an earlier build: a rebuild keeps the version from `pyproject.toml`, and apt skips a `.deb` whose version is already installed ("start-menu is already the newest version") without looking at its contents.
 
 `packaging/build-deb.sh` (runnable from anywhere) builds `dist/start-menu_<version>_all.deb`, which any Debian-based distribution can install if its repositories carry `python3-pyqt6` and Python 3.11 or newer. It installs:
 
@@ -217,6 +221,7 @@ Runs ruff (`ruff.toml`), pyright over the `start_menu` package (`pyrightconfig.j
 ```
 start.sh              launcher (uv run python -m start_menu)
 lint.sh               static checks: ruff, pyright, bash -n
+build.sh              builds the .deb, then offers to install it
 packaging/
   build-deb.sh        builds the .deb into dist/
   start-menu.desktop  the desktop entry template

@@ -23,7 +23,7 @@ Installed from the `.deb` it is `start-menu`, running `/usr/lib/start-menu` unde
 
 ## Layout
 
-Top level: `start_menu/` (the app), `docs/` (the User Guide and its screenshots; not shipped), `packaging/` (`build-deb.sh`, the `.desktop` template, and `icons/` with `source.png`, `make-icons.py` and the generated hicolor PNGs), `start.sh` and `lint.sh`. Tool settings live in `ruff.toml` and `pyrightconfig.json`, so `pyproject.toml` stays the runtime dependency list. The package:
+Top level: `start_menu/` (the app), `docs/` (the User Guide and its screenshots; not shipped), `packaging/` (`build-deb.sh`, the `.desktop` template, and `icons/` with `source.png`, `make-icons.py` and the generated hicolor PNGs), `start.sh`, `lint.sh` and `build.sh` (runs `packaging/build-deb.sh`, then offers to install the result). Tool settings live in `ruff.toml` and `pyrightconfig.json`, so `pyproject.toml` stays the runtime dependency list. The package:
 
 - `__main__.py` — entry point: argparse, `QApplication`, the `sys.excepthook` that turns an escaped exception into a dialog, seeding a missing menu file, startup validation.
 - `menu.py` — the model: YAML in, a tree of `MenuNode` out, with full validation (all errors collected and reported at once, `format_errors()` for the dialog), `dump_menu()` for saving (atomic: temp file + `os.replace`, symlinks followed), and the pure tree edits the window uses — `nodes_at()`, `detach_node()` — plus `resolve_file()` and `TMUX_SESSION_CHARS`. No Qt.
