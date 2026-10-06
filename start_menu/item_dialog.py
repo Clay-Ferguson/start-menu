@@ -251,10 +251,6 @@ class ItemEditDialog(QDialog):
         self._launch_combo.setMinimumWidth(
             metrics.horizontalAdvance(longest_label) + LAUNCH_COMBO_EXTRA_WIDTH
         )
-        launch_row = QHBoxLayout()
-        launch_row.addWidget(self._launch_combo)
-        launch_row.addStretch(1)
-
         # Only meaningful under the tmux launch mode, so the label and field
         # are shown only while that mode is picked (_update_tmux_visibility) —
         # the same "the control decides what's on screen" idea as the file/sh
@@ -286,11 +282,22 @@ class ItemEditDialog(QDialog):
             QFontMetrics(self._target_combo.font()).horizontalAdvance(longest_target)
             + LAUNCH_COMBO_EXTRA_WIDTH
         )
-        target_row = QHBoxLayout()
-        target_row.addWidget(self._target_combo)
-        target_row.addStretch(1)
         target_label.setVisible(nautilus)
         self._target_combo.setVisible(nautilus)
+
+        # The two dropdowns side by side, each under its own label, rather
+        # than stacked: both are short, and the dialog is tall enough already.
+        launch_column = QVBoxLayout()
+        launch_column.addWidget(launch_label)
+        launch_column.addWidget(self._launch_combo)
+        target_column = QVBoxLayout()
+        target_column.addWidget(target_label)
+        target_column.addWidget(self._target_combo)
+        combos_row = QHBoxLayout()
+        combos_row.setSpacing(24)
+        combos_row.addLayout(launch_column)
+        combos_row.addLayout(target_column)
+        combos_row.addStretch(1)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
@@ -312,12 +319,9 @@ class ItemEditDialog(QDialog):
         content_layout.addWidget(cwd_label)
         content_layout.addWidget(self._cwd_edit)
         content_layout.addLayout(cwd_button_row)
-        content_layout.addWidget(launch_label)
-        content_layout.addLayout(launch_row)
+        content_layout.addLayout(combos_row)
         content_layout.addWidget(self._tmux_label)
         content_layout.addWidget(self._tmux_edit)
-        content_layout.addWidget(target_label)
-        content_layout.addLayout(target_row)
         content_layout.addWidget(buttons)
 
         self._name_edit.textChanged.connect(self._validate)
