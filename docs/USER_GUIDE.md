@@ -28,8 +28,8 @@ If the menu file exists but has a problem (invalid YAML, or a menu entry that's 
 
 The window has four parts, top to bottom:
 
+- **Menu bar** — an **Edit** menu holding **New Folder** (`Ctrl+Shift+N`) and **New Item** (`Ctrl+N`), then **Cut** (`Ctrl+X`), **Undo Cut** (`Ctrl+Z`) and **Paste** (`Ctrl+V`). The menu bar is only shown in edit mode, and even then each item is greyed out unless it applies right now (see [Moving Items Between Folders](#moving-items-between-folders)).
 - **Header** — a back arrow (`←`) button plus your current location as a breadcrumb (e.g. `Applications / Browsers`), shown whenever you've navigated into a folder. Clicking the arrow backs up one level, the same as pressing `←`. At the top level, where there's nothing to show and nowhere to back up to, the whole header disappears.
-- **Edit toolbar** — **New Folder** and **New Item**, plus **Cut**, **Undo Cut** and **Paste** whenever those apply. Hidden unless edit mode is turned on (see [Edit Mode](#edit-mode)).
 - **The menu list** — the current folder's items, one per row, each with an icon and a label.
 - **Footer** — the edit mode toggle switch, and a row of key hints (`⏎ launch    e edit menu    q quit`).
 
@@ -77,7 +77,7 @@ By default, Start Menu opens ready to *use* the menu, not change it. To modify a
 
 Turning edit mode on does three things:
 
-1. The editing buttons appear in the toolbar just below the header: **New Folder** and **New Item** always, and **Cut**, **Undo Cut** and **Paste** whenever they apply (see [Moving Items Between Folders](#moving-items-between-folders)).
+1. The menu bar appears, with its **Edit** menu: **New Folder** and **New Item** are always available, and **Cut**, **Undo Cut** and **Paste** whenever they apply (see [Moving Items Between Folders](#moving-items-between-folders)).
 2. The currently highlighted row grows a set of action icons on its right edge: **move up**, **move down**, **edit**, and **delete** (in that order, right to left). These icons only ever appear on the highlighted row — move the highlight with the arrow keys and they follow it.
 3. You can select more than one row at a time — hold **Ctrl** and click to add or remove individual rows, or hold **Shift** and click to select a run of them. This is only useful for **Cut**; turning edit mode back off collapses the selection to a single row again.
 
@@ -98,7 +98,7 @@ Click an icon with the mouse to trigger it, or use `↑`/`↓` to move the highl
 
 ### Creating a New Folder
 
-With edit mode on, click **New Folder**. A small dialog asks for the folder's name; type it and click **Save** (or **Cancel** to back out). The **Save** button stays disabled until you've typed something, since a folder can't be left unnamed.
+With edit mode on, choose **Edit → New Folder** (`Ctrl+Shift+N`). A small dialog asks for the folder's name; type it and click **Save** (or **Cancel** to back out). The **Save** button stays disabled until you've typed something, since a folder can't be left unnamed.
 
 The new folder is added to the **end** of whichever level you're currently viewing — the top level, or whatever folder you've navigated into. It starts out empty; step into it with `→` and use **New Item** to start populating it. Unlike the top-level menu (which always needs at least one item), a folder is allowed to stay empty.
 
@@ -108,7 +108,7 @@ Click a folder's ✎ **edit** icon (with edit mode on and that folder highlighte
 
 ### Creating a New Item
 
-With edit mode on, click **New Item**. This opens the [item editor dialog](#the-item-editor-dialog), described in full below, with all fields blank. Fill it in and click **Save** to add it.
+With edit mode on, choose **Edit → New Item** (`Ctrl+N`). This opens the [item editor dialog](#the-item-editor-dialog), described in full below, with all fields blank. Fill it in and click **Save** to add it.
 
 Like a new folder, the new item is appended to the end of whichever level is currently shown on screen.
 
@@ -178,11 +178,11 @@ Use a row's ↑ and ↓ action icons to move it earlier or later within its curr
 
 Cut and paste moves launchable items from one folder to another. It works on several items at once, and only in edit mode.
 
-1. Select what you want to move: click one row, or Ctrl-click / Shift-click to select several. **Cut** appears in the toolbar as soon as at least one launchable item is selected.
-2. Click **Cut**. The selected rows disappear from the list — that's how you can tell what's waiting to be moved. Nothing has actually changed yet: the menu file on disk is untouched, and the items are simply hidden until they land somewhere.
-3. Navigate to wherever you want them (`→` into folders, `←` back out, as usual), then click **Paste**. The items are added to the **end** of whichever level you're looking at, and the menu file is written out immediately.
+1. Select what you want to move: click one row, or Ctrl-click / Shift-click to select several. **Edit → Cut** becomes available as soon as at least one launchable item is selected.
+2. Choose **Edit → Cut** (or press `Ctrl+X`). The selected rows disappear from the list — that's how you can tell what's waiting to be moved. Nothing has actually changed yet: the menu file on disk is untouched, and the items are simply hidden until they land somewhere.
+3. Navigate to wherever you want them (`→` into folders, `←` back out, as usual), then choose **Edit → Paste** (`Ctrl+V`). The items are added to the **end** of whichever level you're looking at, and the menu file is written out immediately.
 
-While items are waiting to be pasted, the **Cut** button is replaced by **Undo Cut** and **Paste**. **Undo Cut** simply brings the hidden rows back where they were — since a cut never moved anything, there's nothing else to undo.
+While items are waiting to be pasted, **Cut** is greyed out and **Undo Cut** (`Ctrl+Z`) and **Paste** are available instead. **Undo Cut** simply brings the hidden rows back where they were — since a cut never moved anything, there's nothing else to undo.
 
 A few things worth knowing:
 

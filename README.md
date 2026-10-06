@@ -230,7 +230,7 @@ start_menu/
   __main__.py         argparse, QApplication, startup validation, error hook
   menu.py             YAML -> MenuNode tree, with validation, and the tree edits
   launcher.py         the four launch modes, and opening a file in the editor
-  window.py           MainWindow: header, toolbar, footer, every edit and save
+  window.py           MainWindow: menu bar, header, footer, every edit and save
   tree.py             MenuTreeView: the one-level-at-a-time menu itself
   icons.py            where icons come from, and making them the size asked for
   style.py            shared colors and dialog field styling

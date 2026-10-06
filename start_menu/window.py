@@ -1,4 +1,4 @@
-"""The main window: header, the menu, the edit toolbar and the footer.
+"""The main window: menu bar, header, the menu and the footer.
 
 `MainWindow` owns everything that changes the menu or talks to the user in a
 dialog. The menu view itself is `tree.MenuTreeView`, which only reports what
@@ -11,13 +11,13 @@ from __future__ import annotations
 import os
 
 from PyQt6.QtCore import QModelIndex, QSize, Qt
-from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtGui import QAction, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QLabel,
+    QMenuBar,
     QMessageBox,
-    QPushButton,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -39,7 +39,7 @@ from .menu import (
     load_menu,
     nodes_at,
 )
-from .style import HIGHLIGHT_BG
+from .style import HIGHLIGHT_BG, HIGHLIGHT_FG, HOVER_BG
 from .tree import MenuTreeView
 
 HINTS = "⏎ launch    e edit menu    q quit"
@@ -102,29 +102,43 @@ class MainWindow(QWidget):
         # somewhere (see `_handle_cut`).
         self.cut_nodes: list[MenuNode] = []
 
-        self.edit_toolbar = QWidget()
-        edit_toolbar_layout = QHBoxLayout(self.edit_toolbar)
-        edit_toolbar_layout.setContentsMargins(14, 8, 14, 8)
-        edit_toolbar_layout.setSpacing(8)
-        # Cut/Undo Cut/Paste are shown only when they apply, so the toolbar
-        # says what's actually possible right now; `_update_edit_buttons`
-        # decides. New Folder/New Item always apply.
-        self.cut_button = self._toolbar_button("Cut", self._handle_cut)
-        self.undo_cut_button = self._toolbar_button("Undo Cut", self._handle_undo_cut)
-        self.paste_button = self._toolbar_button("Paste", self._handle_paste)
-        for button in (
-            self._toolbar_button("New Folder", self._handle_new_folder),
-            self._toolbar_button("New Item", self._handle_new_item),
-            self.cut_button,
-            self.undo_cut_button,
-            self.paste_button,
-        ):
-            edit_toolbar_layout.addWidget(button)
-        edit_toolbar_layout.addStretch(1)
-        self.edit_toolbar.setVisible(False)  # only shown while edit mode is on
+        # The Edit menu: New Folder/New Item, then Cut/Undo Cut/Paste. Always
+        # listed, so the menu has a fixed shape, but each is enabled only in
+        # edit mode and only when it applies; `_update_edit_actions` decides.
+        # The shortcuts are the usual ones and, like the menu items, do
+        # nothing while disabled.
+        self.new_folder_action = self._edit_action(
+            "New &Folder…", QKeySequence("Ctrl+Shift+N"), self._handle_new_folder
+        )
+        self.new_item_action = self._edit_action(
+            "&New Item…", QKeySequence.StandardKey.New, self._handle_new_item
+        )
+        self.cut_action = self._edit_action("Cu&t", QKeySequence.StandardKey.Cut, self._handle_cut)
+        self.undo_cut_action = self._edit_action(
+            "&Undo Cut", QKeySequence.StandardKey.Undo, self._handle_undo_cut
+        )
+        self.paste_action = self._edit_action(
+            "&Paste", QKeySequence.StandardKey.Paste, self._handle_paste
+        )
+        self.menu_bar = menu_bar = QMenuBar(self)
+        # Set on the bar, the sheet reaches the drop-down too: a QMenu made by
+        # `addMenu(title)` is the bar's child.
+        menu_bar.setStyleSheet(_menu_stylesheet())
+        edit_menu = menu_bar.addMenu("&Edit")
+        assert edit_menu is not None
+        edit_menu.addAction(self.new_folder_action)
+        edit_menu.addAction(self.new_item_action)
+        edit_menu.addSeparator()
+        edit_menu.addAction(self.cut_action)
+        edit_menu.addAction(self.undo_cut_action)
+        edit_menu.addAction(self.paste_action)
+        # Everything in it is for editing, so outside edit mode the bar is
+        # hidden outright: most of the time this is a pop-up launcher, and a
+        # menu bar of greyed-out items is just a strip of wasted space.
+        menu_bar.setVisible(False)
 
-        self.tree.level_changed.connect(self._update_edit_buttons)
-        self.tree.selection_changed.connect(self._update_edit_buttons)
+        self.tree.level_changed.connect(self._update_edit_actions)
+        self.tree.selection_changed.connect(self._update_edit_actions)
 
         self.edit_toggle = ToggleSwitch(self, on_color=HIGHLIGHT_BG)
         self.edit_toggle.toggled.connect(self._handle_edit_toggled)
@@ -148,8 +162,8 @@ class MainWindow(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        layout.setMenuBar(menu_bar)
         layout.addWidget(self.header_bar)
-        layout.addWidget(self.edit_toolbar)
         layout.addWidget(self.tree, 1)
         layout.addWidget(footer)
 
@@ -162,12 +176,15 @@ class MainWindow(QWidget):
         self.tree.set_nodes(nodes)
         self.tree.setFocus()
 
-    def _toolbar_button(self, text: str, slot) -> QPushButton:
-        """One button of the edit toolbar, all styled alike."""
-        button = QPushButton(text)
-        button.setStyleSheet(f"font-size: {UI_POINT_SIZE - 3}pt; padding: 4px 12px;")
-        button.clicked.connect(slot)
-        return button
+    def _edit_action(
+        self, text: str, keys: QKeySequence | QKeySequence.StandardKey, slot
+    ) -> QAction:
+        """One item of the Edit menu, disabled until `_update_edit_actions` says otherwise."""
+        action = QAction(text, self)
+        action.setShortcut(QKeySequence(keys))
+        action.setEnabled(False)
+        action.triggered.connect(slot)
+        return action
 
     def _handle_edit_toggled(self, enabled: bool) -> None:
         """The Edit switch was flipped: show or hide everything editing needs.
@@ -177,25 +194,30 @@ class MainWindow(QWidget):
         a cut never removed them from the menu file in the first place.
         """
         self.tree.set_edit_mode(enabled)
-        self.edit_toolbar.setVisible(enabled)
+        self.menu_bar.setVisible(enabled)
         if not enabled:
             self._clear_cut()
-        self._update_edit_buttons()
+        self._update_edit_actions()
 
-    def _update_edit_buttons(self) -> None:
-        """Show only the toolbar buttons that apply to the current state.
+    def _update_edit_actions(self) -> None:
+        """Enable only the Edit menu items that apply to the current state.
 
-        Cut and Paste are the two halves of one operation and are never
-        offered at the same time: Cut until something has been cut, then Undo
-        Cut and Paste until those items land somewhere.
+        Nothing is enabled outside edit mode, and in it New Folder/New Item
+        always are. Cut and Paste are the two halves
+        of one operation and are never offered at the same time: Cut until
+        something has been cut, then Undo Cut and Paste until those items land
+        somewhere.
         """
-        pending = bool(self.cut_nodes)
-        self.undo_cut_button.setVisible(pending)
-        self.paste_button.setVisible(pending)
+        editing = self.edit_toggle.isChecked()
+        self.new_folder_action.setEnabled(editing)
+        self.new_item_action.setEnabled(editing)
+        pending = editing and bool(self.cut_nodes)
+        self.undo_cut_action.setEnabled(pending)
+        self.paste_action.setEnabled(pending)
         # Folders can't be cut, so a level's folders alone are not something
         # to offer Cut for.
         cuttable = any(not node.is_section for node in self.tree.selected_nodes())
-        self.cut_button.setVisible(not pending and cuttable)
+        self.cut_action.setEnabled(editing and not self.cut_nodes and cuttable)
 
     def _update_header(self) -> None:
         """Show where we are, or nothing at all at the top level.
@@ -309,7 +331,7 @@ class MainWindow(QWidget):
         self._save_and_reload()
 
     def _handle_new_folder(self) -> None:
-        """The toolbar's "New Folder" button was clicked.
+        """Edit → New Folder was chosen.
 
         The new folder is appended to whichever level is currently on
         screen — `self.nodes` at the top, or the section we've drilled into
@@ -326,7 +348,7 @@ class MainWindow(QWidget):
         self._save_and_reload(select_name=name)
 
     def _handle_new_item(self) -> None:
-        """The toolbar's "New Item" button was clicked.
+        """Edit → New Item was chosen.
 
         Same placement rule as "New Folder": the new item is appended to
         whichever level is currently on screen.
@@ -343,7 +365,7 @@ class MainWindow(QWidget):
         self._save_and_reload(select_name=created.name)
 
     def _handle_cut(self) -> None:
-        """The toolbar's "Cut" button was clicked.
+        """Edit → Cut was chosen.
 
         Whatever is selected *right now* becomes the cut set, replacing any
         earlier one — cutting is a reset, not something that accumulates as
@@ -366,18 +388,18 @@ class MainWindow(QWidget):
             return
         self.cut_nodes = selected
         self.tree.set_hidden_nodes(self.cut_nodes)
-        self._update_edit_buttons()
+        self._update_edit_actions()
 
     def _handle_undo_cut(self) -> None:
-        """The toolbar's "Undo Cut" button was clicked: unhide the cut items.
+        """Edit → Undo Cut was chosen: unhide the cut items.
 
         There is nothing else to undo — the cut items never moved.
         """
         self._clear_cut()
-        self._update_edit_buttons()
+        self._update_edit_actions()
 
     def _handle_paste(self) -> None:
-        """The toolbar's "Paste" button was clicked.
+        """Edit → Paste was chosen.
 
         The cut items are appended to whichever level is currently on screen —
         the same placement rule New Folder/New Item use — and *this* is the
@@ -531,6 +553,33 @@ class MainWindow(QWidget):
         error = open_in_editor(self.menu_path, self.options.resolved_editor())
         if error:
             QMessageBox.critical(self, f"{APP_NAME} — cannot edit menu", error)
+
+
+def _menu_stylesheet() -> str:
+    """The menu bar and its drop-down: the app's larger type, room around
+    each entry, and the app's own selection colors.
+
+    Once a QMenu::item rule draws a background, Qt stops handing items to the
+    native style, so the highlight has to be given here too — the same
+    orange as the menu list's selection bar, rather than the desktop accent.
+    A disabled item can still be "selected" by the mouse; it is kept plain,
+    so the highlight never suggests it can be chosen.
+
+    The `min-width` is on the item, not the menu: it is what opens a gap
+    between a label and its right-aligned shortcut, which otherwise sit
+    almost touching ("Undo Cut Ctrl+Z"). A width on QMenu itself widens the
+    frame but leaves the items, and their highlight, at their natural width.
+    """
+    return f"""
+        QMenuBar {{ font-size: {UI_POINT_SIZE - 1}pt; padding: 2px 4px; }}
+        QMenuBar::item {{ padding: 6px 14px; background: transparent; }}
+        QMenuBar::item:selected {{ background: {HOVER_BG}; }}
+        QMenuBar::item:pressed {{ background: {HIGHLIGHT_BG}; color: {HIGHLIGHT_FG}; }}
+        QMenu {{ font-size: {UI_POINT_SIZE - 1}pt; padding: 6px 0; }}
+        QMenu::item {{ padding: 8px 22px; min-width: 200px; background: transparent; }}
+        QMenu::item:selected {{ background: {HIGHLIGHT_BG}; color: {HIGHLIGHT_FG}; }}
+        QMenu::item:disabled:selected {{ background: transparent; }}
+    """
 
 
 def _mtime(path: str) -> int | None:
