@@ -2,14 +2,14 @@
 #
 # This is a starting point, not a real setup — it only uses applications and
 # commands that ship on a standard Ubuntu Desktop install, so it should run
-# as-is. Point Start Menu at a copy of this file, flip on "Edit" (or press
-# "e" to open it in a text editor) to see how each entry is built, and start
-# swapping these items for your own. See README.md for the full reference.
+# as-is. Point Start Menu at a copy of this file, flip on "Edit" (or open it
+# in a text editor) to see how each entry is built, and start swapping these
+# items for your own. See README.md for the full reference.
 
 options:
-  # What "e" opens this file with. xdg-open defers to whatever your desktop
-  # associates with .yaml files; point this at your editor instead, e.g.
-  # "code -n" or "gedit", if you'd rather it always open there.
+  # What the item editor's "Edit" button opens a script file with. xdg-open
+  # defers to whatever your desktop associates with the file; point this at
+  # your editor instead, e.g. "code -n" or "gedit", to always open it there.
   editor: xdg-open
 
 menu:

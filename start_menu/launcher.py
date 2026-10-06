@@ -152,9 +152,8 @@ def launch(
 def open_in_editor(path: str, editor: str) -> str | None:
     """Open `path` in `editor`. Returns an error message, or None on success.
 
-    Shared by the "e" shortcut that opens the whole menu file (window.py) and
-    the "Edit" button beside a script item's file path (item_dialog.py).
-    Routed through launch() as a detached inline snippet, so the editor is
+    Used by the "Edit" button beside a script item's file path
+    (item_dialog.py). Routed through launch() as a detached inline snippet, so the editor is
     spawned exactly the way a `launch: detached` menu item would be — its own
     session, surviving Start Menu. `editor` is shell text, so it may carry
     arguments of its own.

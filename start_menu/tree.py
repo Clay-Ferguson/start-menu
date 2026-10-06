@@ -467,7 +467,7 @@ class MenuTreeView(QTreeView):
     # -- keys ----------------------------------------------------------------
 
     def keyboardSearch(self, search: str) -> None:
-        """Disabled: plain letters are shortcuts here, not type-ahead."""
+        """Disabled: typing letters does nothing here, not even type-ahead."""
 
     def keyPressEvent(self, event) -> None:
         key = event.key()

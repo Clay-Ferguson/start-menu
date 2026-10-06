@@ -83,7 +83,7 @@ cp start_menu/data/example-menu.yaml /tmp/example.yaml
 ./start.sh /tmp/example.yaml
 ```
 
-It's meant to be read as much as run: an "Applications" section of `file:` items (`launch: detached`) launching Firefox, Files, Terminal and Calculator, and a "Shell Script Examples" section of `sh:` snippets (`launch: hold`) that print system and network info, plus an `options.editor` setting. Turn on **Edit** (or press `e` to open the file itself) to see how each piece maps to the reference below, then start replacing the entries with your own. It is also what seeds a new `~/.config/start-menu/menu.yaml`, so a first run drops you straight into it — and since no menu is read from any fixed location, you can equally point `start.sh` at a copy anywhere you like.
+It's meant to be read as much as run: an "Applications" section of `file:` items (`launch: detached`) launching Firefox, Files, Terminal and Calculator, and a "Shell Script Examples" section of `sh:` snippets (`launch: hold`) that print system and network info, plus an `options.editor` setting. Turn on **Edit** (or open the file itself in an editor) to see how each piece maps to the reference below, then start replacing the entries with your own. It is also what seeds a new `~/.config/start-menu/menu.yaml`, so a first run drops you straight into it — and since no menu is read from any fixed location, you can equally point `start.sh` at a copy anywhere you like.
 
 ## Keys
 
@@ -93,8 +93,7 @@ It's meant to be read as much as run: an "Applications" section of `file:` items
 | `→` | Open the highlighted section (no-op on a script) |
 | `←` | Back up one level, landing the highlight on the section you came out of |
 | `⏎` | Launch the highlighted script, or open the highlighted section |
-| `e` | Open the menu file itself in your editor |
-| `Esc` / `q` | Quit |
+| `Esc` | Quit |
 
 The mouse works too: double-click a row to launch or open it, and click the back arrow in the header to go up a level.
 
@@ -111,7 +110,7 @@ options:
 
 | Setting | Meaning |
 |---|---|
-| `editor` | What `e` opens the menu file with. A shell command, so it can carry arguments (`code -n`). Defaults to `$VISUAL`, then `$EDITOR`, then `xdg-open`. A GUI editor is assumed — it is launched detached, with no terminal window, so a terminal editor like `vim` would have nowhere to draw |
+| `editor` | What the item editor's **Edit** button opens a script file with. A shell command, so it can carry arguments (`code -n`). Defaults to `$VISUAL`, then `$EDITOR`, then `xdg-open`. A GUI editor is assumed — it is launched detached, with no terminal window, so a terminal editor like `vim` would have nowhere to draw |
 
 `menu:` holds a list of items. Every item is exactly one of three things, decided by which key it carries: `items:` makes it a **section**, `file:` a **script on disk**, and `sh:` an **inline snippet**. Items appear in the order you write them — there is no sorting.
 

@@ -67,7 +67,7 @@ Every launchable item runs in one of four ways, decided when the item was create
 
 ### Quitting
 
-Press `Esc` or `q` at any time to close the window.
+Press `Esc` at any time to close the window.
 
 ## Edit Mode
 
@@ -259,11 +259,9 @@ You can also launch a Nautilus item from the Start Menu window itself, which is 
 
 ## Opening the Menu File Directly
 
-Press `e` at any time (edit mode doesn't need to be on) to open the menu file itself in a text editor — useful for changes the GUI doesn't offer directly, like moving a whole folder somewhere else, or bulk edits across many items.
+You can also open the menu file itself (normally `~/.config/start-menu/menu.yaml`) in any text editor — useful for changes the GUI doesn't offer directly, like moving a whole folder somewhere else, or bulk edits across many items.
 
-Which editor opens is controlled by the menu file's `options.editor` setting (see below); if that isn't set, Start Menu falls back to the `$VISUAL` or `$EDITOR` environment variables, and finally to your desktop's default handler for `.yaml` files.
-
-The Start Menu window stays open while you edit, but it does **not** automatically notice your changes — edits made this way take effect the next time Start Menu is started, not immediately. (Edits made through the GUI's own dialogs, by contrast, take effect right away, since Start Menu made them itself and reloads the file after saving.)
+A running Start Menu does **not** automatically notice your changes — edits made this way take effect the next time Start Menu is started, not immediately. (Edits made through the GUI's own dialogs, by contrast, take effect right away, since Start Menu made them itself and reloads the file after saving.)
 
 If you edit the file this way and then, in the same session, make a change through the GUI, Start Menu notices the file has changed underneath it. Rather than overwrite your edit, it leaves the file alone, says so, and reloads the menu from the file — make the GUI change again and it will save normally.
 
@@ -275,7 +273,7 @@ Every row shows an icon: a folder icon by default for folders, a generic file ic
 
 ## The Menu File
 
-Everything above is driven by a single YAML file — the one you pointed `start.sh` at. You don't need to hand-edit this file to use Start Menu; the Edit-mode tools cover creating, renaming, reordering, moving, and deleting folders and items. This section is a reference for anyone who wants to edit the file directly (via `e`), or understand what the GUI is actually writing.
+Everything above is driven by a single YAML file — the one you pointed `start.sh` at. You don't need to hand-edit this file to use Start Menu; the Edit-mode tools cover creating, renaming, reordering, moving, and deleting folders and items. This section is a reference for anyone who wants to edit the file directly in a text editor, or understand what the GUI is actually writing.
 
 ### Structure
 
@@ -320,7 +318,7 @@ menu:
 | `tmux_session` | script | Name of the tmux session to use. Required when `launch: tmux`, ignored otherwise — see [Tmux Sessions](#tmux-sessions) |
 | `target_type` | script | `folder` (the default) or `file`: what the item is offered on in Nautilus. Only used inside the `Nautilus` folder — see [Nautilus Integration](#nautilus-integration) |
 | `icon` | folder or script | An icon theme name, or a path to an image file |
-| `options.editor` | top-level setting | The shell command `e` uses to open this file; may include arguments (e.g. `code -n`) |
+| `options.editor` | top-level setting | The shell command the item editor's **Edit** button opens a script file with; may include arguments (e.g. `code -n`). Falls back to `$VISUAL`, `$EDITOR`, then your desktop's default handler |
 
 ### Validation
 

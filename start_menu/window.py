@@ -30,7 +30,7 @@ from . import APP_NAME, UI_POINT_SIZE
 from .folder_dialog import FolderNameDialog
 from .icons import at_size, back_icon
 from .item_dialog import ItemEditDialog
-from .launcher import TMUX_ATTACH, TMUX_CANCEL, TMUX_RESTART, launch, open_in_editor
+from .launcher import TMUX_ATTACH, TMUX_CANCEL, TMUX_RESTART, launch
 from .menu import (
     TARGET_FILE_TYPE,
     MenuError,
@@ -57,7 +57,7 @@ from .nautilus import (
 from .style import HIGHLIGHT_BG, HIGHLIGHT_FG, HOVER_BG
 from .tree import MenuTreeView
 
-HINTS = "⏎ launch    e edit menu    q quit"
+HINTS = "⏎ launch    Esc quit"
 
 BACK_ICON_SIZE = 24  # the header's "go up a level" arrow
 BACK_BUTTON_SIZE = 36  # the clickable square that arrow sits in
@@ -70,7 +70,7 @@ class MainWindow(QWidget):
         self.nodes = nodes
         self.options = options
         # When the file on disk was last known to match `self.nodes`, so a save
-        # can tell whether something else — the "e" editor, most likely — has
+        # can tell whether something else — a text editor, most likely — has
         # rewritten it since. See `_save_and_reload`.
         self._menu_mtime = _mtime(menu_path)
         # Where the last file/folder picked for a Nautilus item was; see
@@ -192,11 +192,9 @@ class MainWindow(QWidget):
         layout.addWidget(self.tree, 1)
         layout.addWidget(footer)
 
-        # Shortcuts rather than keyPressEvent: QAbstractItemView swallows plain
-        # letter keys (its type-ahead search), so "q" would never reach us here.
-        for keys, slot in ((("Esc", "Q"), self.close), (("E",), self.edit_menu)):
-            for key in keys:
-                QShortcut(QKeySequence(key), self).activated.connect(slot)
+        # A shortcut rather than keyPressEvent, so Esc closes the window
+        # whichever widget has the focus.
+        QShortcut(QKeySequence("Esc"), self).activated.connect(self.close)
 
         self.tree.set_nodes(nodes)
         self.tree.setFocus()
@@ -597,7 +595,7 @@ class MainWindow(QWidget):
         if select_name is None:
             select_name = self.tree.current_selection_name()
 
-        # The file was changed behind our back (the "e" editor, usually).
+        # The file was changed behind our back (in a text editor, usually).
         # Saving now would rewrite it from the tree loaded before that edit
         # and silently throw the edit away, so the file wins instead: this
         # change is dropped and the window picks up what's on disk.
@@ -656,16 +654,6 @@ class MainWindow(QWidget):
         self._menu_mtime = _mtime(self.menu_path)
         self.tree.set_nodes(nodes, restore_path=path, select_name=select_name)
         return True
-
-    def edit_menu(self) -> None:
-        """Open the menu file itself in the configured editor.
-
-        The window stays open, but nothing re-reads the file — edits take
-        effect the next time Start Menu starts.
-        """
-        error = open_in_editor(self.menu_path, self.options.resolved_editor())
-        if error:
-            QMessageBox.critical(self, f"{APP_NAME} — cannot edit menu", error)
 
 
 def ask_running_session(
