@@ -15,6 +15,7 @@ from PyQt6.QtCore import QModelIndex, QSize, Qt
 from PyQt6.QtGui import QAction, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QDialog,
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QMenuBar,
@@ -31,6 +32,7 @@ from .icons import at_size, back_icon
 from .item_dialog import ItemEditDialog
 from .launcher import TMUX_ATTACH, TMUX_CANCEL, TMUX_RESTART, launch, open_in_editor
 from .menu import (
+    TARGET_FILE_TYPE,
     MenuError,
     MenuNode,
     Options,
@@ -45,9 +47,12 @@ from .nautilus import (
     PublishError,
     extensions_dir,
     nautilus_folder,
+    nautilus_items,
     publish,
     python_nautilus_available,
     restart_nautilus,
+    target_env,
+    with_target,
 )
 from .style import HIGHLIGHT_BG, HIGHLIGHT_FG, HOVER_BG
 from .tree import MenuTreeView
@@ -68,6 +73,9 @@ class MainWindow(QWidget):
         # can tell whether something else — the "e" editor, most likely — has
         # rewritten it since. See `_save_and_reload`.
         self._menu_mtime = _mtime(menu_path)
+        # Where the last file/folder picked for a Nautilus item was; see
+        # `_pick_nautilus_target`.
+        self._last_target_dir: str | None = None
 
         self.setWindowTitle(APP_NAME)
         self.resize(560, 640)
@@ -256,10 +264,41 @@ class MainWindow(QWidget):
         self.tree.setFocus()
 
     def _launch(self, node: MenuNode) -> None:
-        """Run a script the tree asked for, and say so if it couldn't be run."""
-        error = launch(node, on_running_session=partial(ask_running_session, self))
+        """Run a script the tree asked for, and say so if it couldn't be run.
+
+        An item from the Nautilus folder expects the right-clicked file or
+        folder that Nautilus would have handed it. Launched from here there is
+        none, so the user picks one instead, and it runs exactly as it would
+        from Nautilus on that target; cancelling the picker launches nothing.
+        """
+        exports: dict[str, str] | None = None
+        if any(item is node for item in nautilus_items(self.nodes)):
+            target = self._pick_nautilus_target(node)
+            if target is None:
+                return
+            exports = target_env(target)
+            node = with_target(node, exports)
+        error = launch(
+            node, on_running_session=partial(ask_running_session, self), exports=exports
+        )
         if error:
             QMessageBox.critical(self, f"{APP_NAME} — launch failed", error)
+
+    def _pick_nautilus_target(self, node: MenuNode) -> str | None:
+        """Ask for the file or folder a Nautilus item needs. None if cancelled.
+
+        Starts where the last pick ended, so trying an item on a few targets
+        in a row doesn't mean navigating back each time.
+        """
+        start = self._last_target_dir or os.path.expanduser("~")
+        if node.target_type == TARGET_FILE_TYPE:
+            path, _ = QFileDialog.getOpenFileName(self, "Menu Item requires File", start)
+        else:
+            path = QFileDialog.getExistingDirectory(self, "Menu Item requires Folder", start)
+        if not path:
+            return None
+        self._last_target_dir = path if os.path.isdir(path) else os.path.dirname(path)
+        return path
 
     def _handle_edit_icon(self, index: QModelIndex) -> None:
         """The row's edit icon was clicked: open the dialog for its kind."""

@@ -219,7 +219,7 @@ menu:
 - **How it runs.** Picking an item runs Start Menu itself with no window — `start-menu MENU_FILE --nautilus ITEM TARGET` — which launches the item exactly as the window would, with its own launch mode. Any problem (the item was renamed since the last update, a bad `cwd:`, …) is a dialog.
 - **Update Nautilus** installs a small extension (`start_menu_nautilus.py`) into `~/.local/share/nautilus-python/extensions/`, and writes the item list to `~/.local/share/start-menu/nautilus.json`. The extension reads that list on every right-click, so later updates take effect at once. The very first update, or one after the extension itself has changed, needs Nautilus restarted, and Start Menu offers to do it (`nautilus -q`, which closes open Nautilus windows). Run it again whenever you add, rename or remove items in the folder.
 - **Requires `python3-nautilus`** (`sudo apt install python3-nautilus`); Update Nautilus says so if it's missing. Nautilus menus have no icons, so `icon:` is not used there.
-- Launched from the Start Menu window, a Nautilus item has no target: the variables are unset, and a `cwd: $TARGET_FOLDER` reports a missing working directory.
+- Launched from the Start Menu window, a Nautilus item first asks for its target, with a file picker (titled *Menu Item requires File*) or a folder picker (*Menu Item requires Folder*) as its `target_type` says, then runs just as it would from Nautilus. Cancelling the picker launches nothing.
 
 Recipes for the extras Coral used to build in:
 

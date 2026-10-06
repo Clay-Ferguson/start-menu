@@ -222,7 +222,7 @@ Every launch mode works from Nautilus just as it does from the Start Menu window
 
 Nautilus only shows these items when a **single** file or folder is right-clicked, and adds nothing to the menu you get by right-clicking empty space. Its menus have no icons, so an item's `icon:` isn't shown there; an emoji at the start of the name works instead. One name can be used at most once for *Folders* and once for *Files*.
 
-Launching a Nautilus item from the Start Menu window itself is allowed, but there is nothing right-clicked: the variables are not set, so an item whose working directory is `$TARGET_FOLDER` reports that the folder doesn't exist.
+You can also launch a Nautilus item from the Start Menu window itself, which is handy for trying one out. Since nothing was right-clicked, Start Menu first asks you to choose the target: a file picker titled *Menu Item requires File* for a *Files* item, or a folder picker titled *Menu Item requires Folder* for a *Folders* item. The item then runs exactly as if you had right-clicked your choice in Nautilus. Cancel the picker and nothing runs. Each picker opens where your previous choice was.
 
 ### Examples
 
