@@ -9,6 +9,7 @@ saves every change straight back to the menu file.
 from __future__ import annotations
 
 import os
+from functools import partial
 
 from PyQt6.QtCore import QModelIndex, QSize, Qt
 from PyQt6.QtGui import QAction, QKeySequence, QShortcut
@@ -38,6 +39,15 @@ from .menu import (
     format_errors,
     load_menu,
     nodes_at,
+)
+from .nautilus import (
+    NAUTILUS_FOLDER,
+    PublishError,
+    extensions_dir,
+    nautilus_folder,
+    publish,
+    python_nautilus_available,
+    restart_nautilus,
 )
 from .style import HIGHLIGHT_BG, HIGHLIGHT_FG, HOVER_BG
 from .tree import MenuTreeView
@@ -102,7 +112,8 @@ class MainWindow(QWidget):
         # somewhere (see `_handle_cut`).
         self.cut_nodes: list[MenuNode] = []
 
-        # The Edit menu: New Folder/New Item, then Cut/Undo Cut/Paste. Always
+        # The Edit menu: New Folder/New Item, Cut/Undo Cut/Paste, then Update
+        # Nautilus. Always
         # listed, so the menu has a fixed shape, but each is enabled only in
         # edit mode and only when it applies; `_update_edit_actions` decides.
         # The shortcuts are the usual ones and, like the menu items, do
@@ -120,6 +131,10 @@ class MainWindow(QWidget):
         self.paste_action = self._edit_action(
             "&Paste", QKeySequence.StandardKey.Paste, self._handle_paste
         )
+        # Rare and deliberate, so no shortcut.
+        self.update_nautilus_action = self._edit_action(
+            "Update &Nautilus", None, self._handle_update_nautilus
+        )
         self.menu_bar = menu_bar = QMenuBar(self)
         # Set on the bar, the sheet reaches the drop-down too: a QMenu made by
         # `addMenu(title)` is the bar's child.
@@ -132,6 +147,8 @@ class MainWindow(QWidget):
         edit_menu.addAction(self.cut_action)
         edit_menu.addAction(self.undo_cut_action)
         edit_menu.addAction(self.paste_action)
+        edit_menu.addSeparator()
+        edit_menu.addAction(self.update_nautilus_action)
         # Everything in it is for editing, so outside edit mode the bar is
         # hidden outright: most of the time this is a pop-up launcher, and a
         # menu bar of greyed-out items is just a strip of wasted space.
@@ -177,11 +194,12 @@ class MainWindow(QWidget):
         self.tree.setFocus()
 
     def _edit_action(
-        self, text: str, keys: QKeySequence | QKeySequence.StandardKey, slot
+        self, text: str, keys: QKeySequence | QKeySequence.StandardKey | None, slot
     ) -> QAction:
         """One item of the Edit menu, disabled until `_update_edit_actions` says otherwise."""
         action = QAction(text, self)
-        action.setShortcut(QKeySequence(keys))
+        if keys is not None:
+            action.setShortcut(QKeySequence(keys))
         action.setEnabled(False)
         action.triggered.connect(slot)
         return action
@@ -203,7 +221,7 @@ class MainWindow(QWidget):
         """Enable only the Edit menu items that apply to the current state.
 
         Nothing is enabled outside edit mode, and in it New Folder/New Item
-        always are. Cut and Paste are the two halves
+        and Update Nautilus always are. Cut and Paste are the two halves
         of one operation and are never offered at the same time: Cut until
         something has been cut, then Undo Cut and Paste until those items land
         somewhere.
@@ -211,6 +229,7 @@ class MainWindow(QWidget):
         editing = self.edit_toggle.isChecked()
         self.new_folder_action.setEnabled(editing)
         self.new_item_action.setEnabled(editing)
+        self.update_nautilus_action.setEnabled(editing)
         pending = editing and bool(self.cut_nodes)
         self.undo_cut_action.setEnabled(pending)
         self.paste_action.setEnabled(pending)
@@ -238,40 +257,9 @@ class MainWindow(QWidget):
 
     def _launch(self, node: MenuNode) -> None:
         """Run a script the tree asked for, and say so if it couldn't be run."""
-        error = launch(node, on_running_session=self._ask_running_session)
+        error = launch(node, on_running_session=partial(ask_running_session, self))
         if error:
             QMessageBox.critical(self, f"{APP_NAME} — launch failed", error)
-
-    def _ask_running_session(self, node: MenuNode, session: str, started: str | None) -> str:
-        """Attach to `node`'s already-running tmux session, or restart it?
-
-        Attaching is what this mode did unconditionally, and it stays the
-        default — but it means the script on disk is never read, so an edited
-        script appears to have no effect and the session quietly goes on
-        running the version it was started with. Saying when it started is the
-        point of the dialog: hours or days ago is the tell.
-        """
-        box = QMessageBox(self)
-        box.setIcon(QMessageBox.Icon.Question)
-        box.setWindowTitle(f"{APP_NAME} — session already running")
-        box.setText(f"The tmux session '{session}' is already running.")
-        detail = f"Started {started}.\n\n" if started else ""
-        box.setInformativeText(
-            f"{detail}"
-            "Attach — reconnect to what's running now.\n"
-            f"Restart — end that session and run '{node.name}' again from scratch."
-        )
-        attach = box.addButton("Attach", QMessageBox.ButtonRole.AcceptRole)
-        restart = box.addButton("Restart", QMessageBox.ButtonRole.DestructiveRole)
-        box.addButton(QMessageBox.StandardButton.Cancel)
-        box.setDefaultButton(attach)  # the safe one: restarting kills a process
-        box.exec()
-        clicked = box.clickedButton()
-        if clicked is attach:
-            return TMUX_ATTACH
-        if clicked is restart:
-            return TMUX_RESTART
-        return TMUX_CANCEL  # includes closing the dialog outright
 
     def _handle_edit_icon(self, index: QModelIndex) -> None:
         """The row's edit icon was clicked: open the dialog for its kind."""
@@ -288,15 +276,20 @@ class MainWindow(QWidget):
             node.name = new_name
             self._save_and_reload()
             return
+        siblings = self._sibling_list(index)
         dialog = ItemEditDialog(
-            node, self, title="Edit Item", editor=self.options.resolved_editor()
+            node,
+            self,
+            title="Edit Item",
+            editor=self.options.resolved_editor(),
+            nautilus=self._is_nautilus_level(siblings),
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         edited = dialog.edited_item()
         if not edited.name:
             return
-        self._sibling_list(index)[index.row()] = edited
+        siblings[index.row()] = edited
         # By name, since the edit may have renamed the very row to highlight.
         self._save_and_reload(select_name=edited.name)
 
@@ -353,15 +346,19 @@ class MainWindow(QWidget):
         Same placement rule as "New Folder": the new item is appended to
         whichever level is currently on screen.
         """
+        level = self._current_level_nodes()
         dialog = ItemEditDialog(
-            parent=self, title="Create Item", editor=self.options.resolved_editor()
+            parent=self,
+            title="Create Item",
+            editor=self.options.resolved_editor(),
+            nautilus=self._is_nautilus_level(level),
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         created = dialog.edited_item()
         if not created.name:
             return
-        self._current_level_nodes().append(created)
+        level.append(created)
         self._save_and_reload(select_name=created.name)
 
     def _handle_cut(self) -> None:
@@ -431,6 +428,83 @@ class MainWindow(QWidget):
         row-path `current_path()` describes.
         """
         return nodes_at(self.nodes, self.tree.current_path())
+
+    def _is_nautilus_level(self, siblings: list[MenuNode]) -> bool:
+        """Whether `siblings` is the Nautilus folder's own list of items —
+        the items that get the item dialog's Nautilus target setting."""
+        folder = nautilus_folder(self.nodes)
+        return folder is not None and siblings is folder.children
+
+    def _handle_update_nautilus(self) -> None:
+        """Edit → Update Nautilus: offer the Nautilus folder's items in Nautilus.
+
+        Publishes what the file on disk says, since that is what the
+        windowless launch Nautilus triggers will read: if it was changed
+        behind our back, it's reloaded first, as `_save_and_reload` would.
+        """
+        if _mtime(self.menu_path) != self._menu_mtime:
+            path = self.tree.breadcrumb()
+            if not self._reload_from_disk(path, self.tree.current_selection_name()):
+                return
+        try:
+            result = publish(self.menu_path, self.nodes)
+        except PublishError as exc:
+            QMessageBox.warning(self, f"{APP_NAME} — cannot update Nautilus", str(exc))
+            return
+        except OSError as exc:
+            QMessageBox.critical(
+                self, f"{APP_NAME} — cannot update Nautilus", f"Could not write:\n\n{exc}"
+            )
+            return
+
+        title = f"{APP_NAME} — Nautilus updated"
+        if result.items:
+            names = "\n".join(f"  • {item.name} ({item.target_type}s)" for item in result.items)
+            summary = f"Nautilus's right-click menu now offers:\n\n{names}"
+        elif nautilus_folder(self.nodes) is None:
+            summary = (
+                f"There is no top-level folder named '{NAUTILUS_FOLDER}', so nothing is "
+                "offered in Nautilus. Create one, put the items to offer in it, and "
+                "update again."
+            )
+        else:
+            summary = f"The '{NAUTILUS_FOLDER}' folder has no items, so nothing is offered."
+        if not python_nautilus_available():
+            # Checked last and said anyway: the files are in place, and are
+            # picked up as soon as the package is.
+            summary += (
+                "\n\nNautilus can't load the menu yet: its Python extension support "
+                "is not installed. Install it with:\n\n  sudo apt install python3-nautilus\n\n"
+                "then restart Nautilus (nautilus -q)."
+            )
+            QMessageBox.warning(self, title, summary)
+            return
+        if not result.extension_changed:
+            QMessageBox.information(self, title, summary)
+            return
+
+        # A new or changed extension is only loaded when Nautilus starts.
+        reply = QMessageBox.question(
+            self,
+            title,
+            f"{summary}\n\n"
+            f"{APP_NAME}'s extension was installed in {extensions_dir()}, and "
+            "Nautilus only loads extensions when it starts.\n\n"
+            "Restart Nautilus now? Any open Nautilus windows will close.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            error = restart_nautilus()
+            if error:
+                QMessageBox.critical(self, f"{APP_NAME} — cannot restart Nautilus", error)
+        else:
+            QMessageBox.information(
+                self,
+                title,
+                "The new menu appears the next time Nautilus starts — after "
+                "`nautilus -q`, or logging out and back in.",
+            )
 
     def _handle_move(self, index: QModelIndex, delta: int) -> None:
         """The row's move up/down icon was clicked; `delta` is -1 or +1."""
@@ -553,6 +627,43 @@ class MainWindow(QWidget):
         error = open_in_editor(self.menu_path, self.options.resolved_editor())
         if error:
             QMessageBox.critical(self, f"{APP_NAME} — cannot edit menu", error)
+
+
+def ask_running_session(
+    parent: QWidget | None, node: MenuNode, session: str, started: str | None
+) -> str:
+    """Attach to `node`'s already-running tmux session, or restart it?
+
+    Attaching is what this mode did unconditionally, and it stays the
+    default — but it means the script on disk is never read, so an edited
+    script appears to have no effect and the session quietly goes on
+    running the version it was started with. Saying when it started is the
+    point of the dialog: hours or days ago is the tell.
+
+    A function rather than a MainWindow method because the windowless
+    `--nautilus` launch (see __main__) asks it too, with no parent.
+    """
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Question)
+    box.setWindowTitle(f"{APP_NAME} — session already running")
+    box.setText(f"The tmux session '{session}' is already running.")
+    detail = f"Started {started}.\n\n" if started else ""
+    box.setInformativeText(
+        f"{detail}"
+        "Attach — reconnect to what's running now.\n"
+        f"Restart — end that session and run '{node.name}' again from scratch."
+    )
+    attach = box.addButton("Attach", QMessageBox.ButtonRole.AcceptRole)
+    restart = box.addButton("Restart", QMessageBox.ButtonRole.DestructiveRole)
+    box.addButton(QMessageBox.StandardButton.Cancel)
+    box.setDefaultButton(attach)  # the safe one: restarting kills a process
+    box.exec()
+    clicked = box.clickedButton()
+    if clicked is attach:
+        return TMUX_ATTACH
+    if clicked is restart:
+        return TMUX_RESTART
+    return TMUX_CANCEL  # includes closing the dialog outright
 
 
 def _menu_stylesheet() -> str:

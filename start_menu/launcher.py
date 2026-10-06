@@ -51,8 +51,16 @@ TMUX_CANCEL = "cancel"
 def launch(
     node: MenuNode,
     on_running_session: Callable[[MenuNode, str, str | None], str] | None = None,
+    exports: dict[str, str] | None = None,
 ) -> str | None:
     """Run `node`'s script. Returns an error message, or None on success.
+
+    `exports` are environment variables the script must see — the Nautilus
+    target (`$TARGET_FOLDER`/`$TARGET_FILE`) is the one use. They are written
+    into the generated program itself (see `build_command`) rather than only
+    into the spawned process's environment, because in tmux mode that
+    environment never reaches the script: a tmux server that is already
+    running starts new sessions from its *own* environment, not the client's.
 
     `on_running_session` is consulted only in tmux mode, and only when the
     item's session already exists with something still alive in it — the case
@@ -122,7 +130,7 @@ def launch(
                 if error:
                     return f"Cannot restart '{node.name}':\n\n{error}"
 
-    cmd = build_command(node)
+    cmd = build_command(node, exports)
 
     if node.launch == LAUNCH_DETACHED:
         argv = ["bash", "-lc", cmd]
@@ -171,7 +179,7 @@ def open_in_editor(path: str, editor: str) -> str | None:
     return launch(node)
 
 
-def build_command(node: MenuNode) -> str:
+def build_command(node: MenuNode, exports: dict[str, str] | None = None) -> str:
     """The `bash -c` program that runs `node` under its launch mode.
 
     An inline `sh` snippet needs no file on disk: bash -c takes a whole
@@ -182,12 +190,18 @@ def build_command(node: MenuNode) -> str:
     `tmux` mode builds the same program every other mode would, then hands it
     to `_build_tmux_wrapper` to be run inside a tmux session rather than
     directly in the window.
+
+    `exports` (see `launch`) are exported ahead of the `cd`, on the same line,
+    so every line number bash reports keeps the offset described below.
     """
     hold = node.launch == LAUNCH_HOLD
     cwd = node.resolved_cwd
     if cwd is None:
         raise ValueError(f"'{node.name}' has no working directory")  # launch() checks first
     cd = f"cd {shlex.quote(cwd)} || exit 1"
+    if exports:
+        assignments = " ".join(f"{k}={shlex.quote(v)}" for k, v in exports.items())
+        cd = f"export {assignments}; {cd}"
 
     if node.sh is not None:
         label = node.name

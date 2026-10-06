@@ -153,6 +153,7 @@ menu:
 | `launch` | script | no | How to run it (see below). Default `terminal` |
 | `cwd` | script | yes | Working directory to run in. `~` and `$VARS` are expanded; `cwd: ~` on its own means your home folder. There is no default — an item with no `cwd:`, or one pointing at a folder that no longer exists, fails with a dialog when you try to launch it, rather than at startup |
 | `tmux_session` | script | with `launch: tmux` | Name of the tmux session to create or reattach to. Letters, digits, `_` and `-` only (see [Tmux sessions](#tmux-sessions)). Like `cwd:`, a missing or malformed one is reported when you launch, not at startup |
+| `target_type` | script | no | `folder` or `file`: which right-clicks in Nautilus offer the item. Only means anything inside the `Nautilus` folder (see [Nautilus integration](#nautilus-integration)). Default `folder` |
 | `icon` | all | no | An icon theme name (`utilities-terminal`) or a path to an image file. Defaults to a folder icon for sections, a file icon for scripts |
 
 ### Inline `sh:` snippets
@@ -193,6 +194,43 @@ The name is matched **exactly** (tmux's `=` target prefix). Without that, a `tmu
 
 tmux must be installed (`sudo apt install tmux`). It's checked before anything is spawned, so a missing tmux is a dialog rather than a terminal window that flashes open and dies.
 
+### Nautilus integration
+
+Items can also appear on Nautilus's right-click menu, run on whatever was right-clicked. Put them in a **top-level folder named exactly `Nautilus`**, then switch on Edit and choose **Edit → Update Nautilus**. Only the scripts directly inside that folder are offered; folders inside it are ignored.
+
+```yaml
+menu:
+  - folder: Nautilus
+    items:
+      - name: Open in VS Code
+        launch: detached
+        cwd: $TARGET_FOLDER
+        sh: code "$TARGET_FOLDER"
+
+      - name: Run Script            # runs the right-clicked file itself
+        target_type: file
+        launch: hold
+        cwd: $TARGET_FOLDER
+        file: $TARGET_FILE
+```
+
+- **`target_type:`** decides where an item is offered: `folder` (the default) on folders, `file` on files. Nothing is added to the empty-space menu, and nothing is offered when more than one thing is selected. Names must be unique within each kind; one name can be used once for files and once for folders.
+- **What the item is told.** A folder sets `$TARGET_FOLDER`. A file sets `$TARGET_FILE`, plus its parent folder as `$TARGET_FOLDER`, so `cwd: $TARGET_FOLDER` works for both. Both variables are available to the script in every launch mode (tmux included). They are also substituted into the item's own `cwd:` and `file:`, as above. Quoting them there (`"$TARGET_FOLDER"`, as you would in a script) is fine: a `cwd:` or `file:` wrapped in one pair of matching quotes has them removed.
+- **How it runs.** Picking an item runs Start Menu itself with no window — `start-menu MENU_FILE --nautilus ITEM TARGET` — which launches the item exactly as the window would, with its own launch mode. Any problem (the item was renamed since the last update, a bad `cwd:`, …) is a dialog.
+- **Update Nautilus** installs a small extension (`start_menu_nautilus.py`) into `~/.local/share/nautilus-python/extensions/`, and writes the item list to `~/.local/share/start-menu/nautilus.json`. The extension reads that list on every right-click, so later updates take effect at once. The very first update, or one after the extension itself has changed, needs Nautilus restarted, and Start Menu offers to do it (`nautilus -q`, which closes open Nautilus windows). Run it again whenever you add, rename or remove items in the folder.
+- **Requires `python3-nautilus`** (`sudo apt install python3-nautilus`); Update Nautilus says so if it's missing. Nautilus menus have no icons, so `icon:` is not used there.
+- Launched from the Start Menu window, a Nautilus item has no target: the variables are unset, and a `cwd: $TARGET_FOLDER` reports a missing working directory.
+
+Recipes for the extras Coral used to build in:
+
+| Item | `target_type` | `launch` | `cwd` | Command |
+|---|---|---|---|---|
+| Copy Full Path | `file`, and the same item again as `folder` | `detached` | `$TARGET_FOLDER` | `sh: printf %s "${TARGET_FILE:-$TARGET_FOLDER}" \| xclip -selection clipboard` (needs `xclip`) |
+| Run Script | `file` | `hold` | `$TARGET_FOLDER` | `file: $TARGET_FILE` |
+| Open Terminal Here | `folder` | `detached` | `$TARGET_FOLDER` | `sh: gnome-terminal --working-directory="$TARGET_FOLDER"` |
+
+Commands run under the same `bash -lc` as every other launch, so `~/.profile` is read but an interactive-only `~/.bashrc` (where nvm usually lives) is not: give such tools their full path, or source what they need in the item.
+
 ### Errors
 
 The menu file is validated on load. Every problem found is reported at once, each tagged with the offending item's location:
@@ -227,16 +265,19 @@ packaging/
   start-menu.desktop  the desktop entry template
   icons/              source.png, make-icons.py and the hicolor PNGs it generates
 start_menu/
-  __main__.py         argparse, QApplication, startup validation, error hook
+  __main__.py         argparse, QApplication, startup validation, error hook,
+                      and the windowless --nautilus launch
   menu.py             YAML -> MenuNode tree, with validation, and the tree edits
   launcher.py         the four launch modes, and opening a file in the editor
+  nautilus.py         the Nautilus folder: publishing it, and the $TARGET_* variables
   window.py           MainWindow: menu bar, header, footer, every edit and save
   tree.py             MenuTreeView: the one-level-at-a-time menu itself
   icons.py            where icons come from, and making them the size asked for
   style.py            shared colors and dialog field styling
   folder_dialog.py    naming a folder
   item_dialog.py      editing a launchable item
-  data/               example-menu.yaml (seeds a new menu file) and the window icon
+  data/               example-menu.yaml (seeds a new menu file), the window icon, and
+                      start_menu_nautilus.py (the Nautilus extension Update Nautilus installs)
 ```
 
 The tree is a real `QTreeView` over a `QStandardItemModel`; showing one level at a time is `setRootIndex()` rather than expanding, which is why per-item icons and everything else native comes for free.

@@ -143,7 +143,7 @@ chmod 644 "$STAGE/usr/share/applications/start-menu.desktop"
 #   - every import inside the staged packages names a file that was staged;
 #   - the example menu is there, and loads with no validation errors;
 #   - the modules import: all of them where /usr/bin/python3 has PyQt6, and
-#     otherwise the Qt-free ones (menu, launcher).
+#     otherwise the Qt-free ones (menu, launcher, nautilus).
 [ -x /usr/bin/python3 ] || die "/usr/bin/python3 not found; it is needed to check the staged files (apt install python3)."
 /usr/bin/python3 -I -B - "$LIB" <<'PY' || die "the staged files failed the smoke test (above); nothing was packaged."
 import ast
@@ -181,9 +181,9 @@ for package in ("start_menu", "windowchrome"):
                         problems.append(f"{where}: import {name}")
 
 data = lib / "start_menu" / "data"
-for name in ("example-menu.yaml", "start-menu.png"):
+for name in ("example-menu.yaml", "start-menu.png", "start_menu_nautilus.py"):
     if not (data / name).is_file():
-        problems.append(f"start_menu/data/{name} is missing (__main__ reads it)")
+        problems.append(f"start_menu/data/{name} is missing (the app reads it)")
 
 try:
     import yaml  # noqa: F401
@@ -203,7 +203,7 @@ try:
     modules = [p.stem for p in (lib / "start_menu").glob("*.py") if p.stem != "__init__"]
     scope = "every module"
 except ImportError:
-    modules = ["menu", "launcher"]
+    modules = ["menu", "launcher", "nautilus"]
     scope = "the Qt-free modules (no PyQt6 for this python3)"
 for name in sorted(modules):
     try:
@@ -259,7 +259,8 @@ INSTALLED_SIZE="$(du -sk --exclude=DEBIAN "$STAGE" | cut -f1)"
 # A terminal emulator is needed by the 'terminal' and 'hold' launch modes and
 # tmux by the 'tmux' mode, but neither is a hard dependency: launcher.py checks
 # for them and explains itself in a dialog, so a machine that never uses those
-# modes has no reason to carry them.
+# modes has no reason to carry them. python3-nautilus likewise, for the
+# Nautilus integration: Edit → Update Nautilus says when it is missing.
 #
 # libqt6svg6 *is* a hard dependency, for a reason that is not obvious: it
 # carries Qt's SVG image-format plugin, and without it Qt cannot read an icon
@@ -278,7 +279,7 @@ Priority: optional
 Architecture: $ARCH
 Depends: python3 (>= 3.11), python3-pyqt6, python3-yaml, libqt6svg6
 Recommends: qt6-wayland, x-terminal-emulator
-Suggests: tmux
+Suggests: tmux, python3-nautilus
 Maintainer: $START_MENU_MAINTAINER
 Installed-Size: $INSTALLED_SIZE
 Homepage: https://github.com/Clay-Ferguson/start-menu

@@ -39,6 +39,9 @@ from .menu import (
     LAUNCH_MODES,
     LAUNCH_TERMINAL,
     LAUNCH_TMUX,
+    TARGET_FILE_TYPE,
+    TARGET_FOLDER_TYPE,
+    TARGET_TYPES,
     TMUX_SESSION_CHARS,
     MenuNode,
     resolve_file,
@@ -58,6 +61,12 @@ LAUNCH_LABELS = {
     LAUNCH_TERMINAL: "Terminal (terminal auto-closes)",
     LAUNCH_HOLD: "Hold (terminal stays open)",
     LAUNCH_TMUX: "Tmux (session keeps running)",
+}
+
+# The same for the Nautilus target combobox (`target_type:`).
+TARGET_TYPE_LABELS = {
+    TARGET_FOLDER_TYPE: "Folders ($TARGET_FOLDER)",
+    TARGET_FILE_TYPE: "Files ($TARGET_FILE)",
 }
 
 # Same restriction launcher.py enforces on a hand-edited menu file; here it
@@ -89,6 +98,10 @@ class ItemEditDialog(QDialog):
     matching editor for that choice is shown, swapped via a QStackedWidget.
     The working directory (`cwd:`) is required and applies to both kinds, so
     it sits below the stacked file/sh editor rather than inside either page.
+
+    `nautilus` says the item lives in the Nautilus folder (see nautilus.py),
+    the one place its `target_type:` means anything, so only then is that
+    shown; anywhere else it is carried over untouched, like `icon:`.
     """
 
     def __init__(
@@ -97,6 +110,7 @@ class ItemEditDialog(QDialog):
         parent: QWidget | None = None,
         title: str = "Edit Item",
         editor: str = "",
+        nautilus: bool = False,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
@@ -254,6 +268,30 @@ class ItemEditDialog(QDialog):
             QRegularExpressionValidator(QRegularExpression(TMUX_SESSION_PATTERN), self)
         )
 
+        # Which right-clicks in Nautilus offer this item, and so which of
+        # $TARGET_FOLDER/$TARGET_FILE it can count on.
+        target_label = QLabel("Show in Nautilus on:")
+        target_label.setStyleSheet(LABEL_STYLE)
+        self._target_combo = QComboBox()
+        self._target_combo.setStyleSheet(field_style())
+        for target_type in TARGET_TYPES:
+            self._target_combo.addItem(TARGET_TYPE_LABELS[target_type], target_type)
+        target_index = self._target_combo.findData(node.target_type)
+        self._target_combo.setCurrentIndex(target_index if target_index >= 0 else 0)
+        # Sized the way the launch combo is, for the same reasons.
+        self._target_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self._target_combo.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+        longest_target = max(TARGET_TYPE_LABELS.values(), key=len)
+        self._target_combo.setMinimumWidth(
+            QFontMetrics(self._target_combo.font()).horizontalAdvance(longest_target)
+            + LAUNCH_COMBO_EXTRA_WIDTH
+        )
+        target_row = QHBoxLayout()
+        target_row.addWidget(self._target_combo)
+        target_row.addStretch(1)
+        target_label.setVisible(nautilus)
+        self._target_combo.setVisible(nautilus)
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
         )
@@ -278,6 +316,8 @@ class ItemEditDialog(QDialog):
         content_layout.addLayout(launch_row)
         content_layout.addWidget(self._tmux_label)
         content_layout.addWidget(self._tmux_edit)
+        content_layout.addWidget(target_label)
+        content_layout.addLayout(target_row)
         content_layout.addWidget(buttons)
 
         self._name_edit.textChanged.connect(self._validate)
@@ -375,4 +415,5 @@ class ItemEditDialog(QDialog):
             launch=self._launch_combo.currentData(),
             cwd=self._cwd_edit.text().strip(),
             tmux_session=self._tmux_edit.text().strip() or None,
+            target_type=self._target_combo.currentData(),
         )

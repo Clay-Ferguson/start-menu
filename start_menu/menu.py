@@ -24,8 +24,17 @@ LAUNCH_TMUX = "tmux"  # window attaches to a named tmux session that outlives it
 LAUNCH_MODES = (LAUNCH_DETACHED, LAUNCH_TERMINAL, LAUNCH_HOLD, LAUNCH_TMUX)
 DEFAULT_LAUNCH = LAUNCH_TERMINAL
 
+# What an item in the Nautilus folder is offered on, when right-clicked in
+# Nautilus (see nautilus.py). Meaningless anywhere else in the menu, but
+# accepted on any script so an item keeps its setting when it's moved out
+# of that folder and back.
+TARGET_FOLDER_TYPE = "folder"
+TARGET_FILE_TYPE = "file"
+TARGET_TYPES = (TARGET_FOLDER_TYPE, TARGET_FILE_TYPE)
+DEFAULT_TARGET_TYPE = TARGET_FOLDER_TYPE
+
 SECTION_KEYS = {"folder", "icon", "items"}
-SCRIPT_KEYS = {"name", "icon", "file", "sh", "launch", "cwd", "tmux_session"}
+SCRIPT_KEYS = {"name", "icon", "file", "sh", "launch", "cwd", "tmux_session", "target_type"}
 OPTION_KEYS = {"editor"}
 TOP_LEVEL_KEYS = {"menu", "options"}
 
@@ -68,6 +77,7 @@ class MenuNode:
     launch: str = DEFAULT_LAUNCH
     cwd: str | None = None
     tmux_session: str | None = None
+    target_type: str = DEFAULT_TARGET_TYPE
     children: list["MenuNode"] = field(default_factory=list)
 
     @property
@@ -112,7 +122,7 @@ def resolve_file(file: str, cwd: str | None) -> str:
     A function of its own, rather than only the property, so the item dialog
     can resolve what is typed into its fields before any MenuNode exists.
     """
-    expanded = os.path.expanduser(os.path.expandvars(file))
+    expanded = os.path.expanduser(os.path.expandvars(_unquote(file)))
     if os.path.isabs(expanded):
         return os.path.realpath(expanded)
     if cwd:
@@ -121,7 +131,22 @@ def resolve_file(file: str, cwd: str | None) -> str:
 
 
 def _expand(path: str) -> str:
-    return os.path.realpath(os.path.expanduser(os.path.expandvars(path)))
+    return os.path.realpath(os.path.expanduser(os.path.expandvars(_unquote(path))))
+
+
+def _unquote(path: str) -> str:
+    """`path` without one pair of matching quotes around the whole of it.
+
+    `file:` and `cwd:` are paths, not shell text — nothing ever runs them
+    through a shell to strip quotes. But `"$TARGET_FOLDER"` is exactly how the
+    same thing is written in a script, so it is what people type into these
+    fields too, and kept literally it names a folder called `"/home/…"`. No
+    real path both starts and ends with a quote, so the pair can only have
+    been meant as quoting.
+    """
+    if len(path) >= 2 and path[0] == path[-1] and path[0] in "\"'":
+        return path[1:-1]
+    return path
 
 
 def nodes_at(nodes: list[MenuNode], rows: list[int]) -> list[MenuNode]:
@@ -325,6 +350,13 @@ def _parse_node(raw, where: str, errors: list[str]) -> MenuNode | None:
         errors.append(f"{label}: 'tmux_session:' must be text, got {_kind(tmux_session)}.")
         tmux_session = None
 
+    target_type = raw.get("target_type", DEFAULT_TARGET_TYPE)
+    if not isinstance(target_type, str) or target_type not in TARGET_TYPES:
+        errors.append(
+            f"{label}: unknown target type {target_type!r}; expected one of {_join(TARGET_TYPES)}."
+        )
+        target_type = DEFAULT_TARGET_TYPE
+
     return MenuNode(
         name=name,
         icon=icon,
@@ -333,6 +365,7 @@ def _parse_node(raw, where: str, errors: list[str]) -> MenuNode | None:
         launch=launch,
         cwd=cwd,
         tmux_session=tmux_session,
+        target_type=target_type,
     )
 
 
@@ -375,6 +408,8 @@ def _node_to_dict(node: MenuNode) -> dict:
         d["cwd"] = node.cwd
     if node.tmux_session:
         d["tmux_session"] = node.tmux_session
+    if node.target_type != DEFAULT_TARGET_TYPE:
+        d["target_type"] = node.target_type
     return d
 
 
