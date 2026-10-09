@@ -45,6 +45,7 @@ from .menu import (
 from .nautilus import (
     NAUTILUS_FOLDER,
     PublishError,
+    clear,
     extensions_dir,
     nautilus_folder,
     nautilus_items,
@@ -121,7 +122,7 @@ class MainWindow(QWidget):
         self.cut_nodes: list[MenuNode] = []
 
         # The Edit menu: New Folder/New Item, Cut/Undo Cut/Paste, then Update
-        # Nautilus. Always
+        # Nautilus/Clear Nautilus. Always
         # listed, so the menu has a fixed shape, but each is enabled only in
         # edit mode and only when it applies; `_update_edit_actions` decides.
         # The shortcuts are the usual ones and, like the menu items, do
@@ -143,6 +144,9 @@ class MainWindow(QWidget):
         self.update_nautilus_action = self._edit_action(
             "Update &Nautilus", None, self._handle_update_nautilus
         )
+        self.clear_nautilus_action = self._edit_action(
+            "C&lear Nautilus Items", None, self._handle_clear_nautilus
+        )
         self.menu_bar = menu_bar = QMenuBar(self)
         # Set on the bar, the sheet reaches the drop-down too: a QMenu made by
         # `addMenu(title)` is the bar's child.
@@ -157,6 +161,7 @@ class MainWindow(QWidget):
         edit_menu.addAction(self.paste_action)
         edit_menu.addSeparator()
         edit_menu.addAction(self.update_nautilus_action)
+        edit_menu.addAction(self.clear_nautilus_action)
         # Everything in it is for editing, so outside edit mode the bar is
         # hidden outright: most of the time this is a pop-up launcher, and a
         # menu bar of greyed-out items is just a strip of wasted space.
@@ -227,7 +232,7 @@ class MainWindow(QWidget):
         """Enable only the Edit menu items that apply to the current state.
 
         Nothing is enabled outside edit mode, and in it New Folder/New Item
-        and Update Nautilus always are. Cut and Paste are the two halves
+        and Update Nautilus/Clear Nautilus always are. Cut and Paste are the two halves
         of one operation and are never offered at the same time: Cut until
         something has been cut, then Undo Cut and Paste until those items land
         somewhere.
@@ -236,6 +241,7 @@ class MainWindow(QWidget):
         self.new_folder_action.setEnabled(editing)
         self.new_item_action.setEnabled(editing)
         self.update_nautilus_action.setEnabled(editing)
+        self.clear_nautilus_action.setEnabled(editing)
         pending = editing and bool(self.cut_nodes)
         self.undo_cut_action.setEnabled(pending)
         self.paste_action.setEnabled(pending)
@@ -542,6 +548,37 @@ class MainWindow(QWidget):
                 "The new menu appears the next time Nautilus starts — after "
                 "`nautilus -q`, or logging out and back in.",
             )
+
+    def _handle_clear_nautilus(self) -> None:
+        """Edit → Clear Nautilus: take everything back off Nautilus's menu.
+
+        Leaves the menu file alone — the Nautilus folder and its items stay,
+        and Update Nautilus offers them again.
+        """
+        title = f"{APP_NAME} — Clear Nautilus"
+        reply = QMessageBox.question(
+            self,
+            title,
+            f"Remove all of {APP_NAME}'s items from Nautilus's right-click menu?\n\n"
+            f"The '{NAUTILUS_FOLDER}' folder in this menu is not changed; "
+            "Update Nautilus puts its items back.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            removed = clear()
+        except OSError as exc:
+            QMessageBox.critical(self, title, f"Could not remove:\n\n{exc}")
+            return
+        QMessageBox.information(
+            self,
+            title,
+            f"{APP_NAME}'s items were removed from Nautilus's right-click menu."
+            if removed
+            else f"Nautilus had no {APP_NAME} items to remove.",
+        )
 
     def _handle_move(self, index: QModelIndex, delta: int) -> None:
         """The row's move up/down icon was clicked; `delta` is -1 or +1."""

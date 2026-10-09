@@ -227,6 +227,27 @@ def publish(menu_path: str, nodes: list[MenuNode]) -> PublishResult:
     return PublishResult(items=items, extension_changed=extension_changed)
 
 
+def clear() -> bool:
+    """Edit → Clear Nautilus: undo `publish`. True if anything was removed.
+
+    Deletes the manifest and the installed extension. The manifest going is
+    what takes the items off at once: an extension Nautilus already loaded
+    finds no manifest on the next right-click and offers nothing, so no
+    restart is needed. The extension going means it isn't loaded at all from
+    the next start on. A later publish reinstalls both (and, the extension
+    being new again, offers the restart). Raises OSError if one can't be
+    deleted.
+    """
+    removed = False
+    for path in (manifest_path(), os.path.join(extensions_dir(), EXTENSION_NAME)):
+        try:
+            os.unlink(path)
+            removed = True
+        except FileNotFoundError:
+            pass
+    return removed
+
+
 def restart_nautilus() -> str | None:
     """Quit Nautilus so it loads the extension when it next opens. Error, or None."""
     try:

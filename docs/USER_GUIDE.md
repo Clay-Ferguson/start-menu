@@ -77,7 +77,7 @@ By default, Start Menu opens ready to *use* the menu, not change it. To modify a
 
 Turning edit mode on does three things:
 
-1. The menu bar appears, with its **Edit** menu: **New Folder** and **New Item** are always available, **Cut**, **Undo Cut** and **Paste** whenever they apply (see [Moving Items Between Folders](#moving-items-between-folders)), and **Update Nautilus** (see [Nautilus Integration](#nautilus-integration)).
+1. The menu bar appears, with its **Edit** menu: **New Folder** and **New Item** are always available, **Cut**, **Undo Cut** and **Paste** whenever they apply (see [Moving Items Between Folders](#moving-items-between-folders)), and **Update Nautilus** and **Clear Nautilus** (see [Nautilus Integration](#nautilus-integration)).
 2. The currently highlighted row grows a set of action icons on its right edge: **move up**, **move down**, **edit**, and **delete** (in that order, right to left). These icons only ever appear on the highlighted row — move the highlight with the arrow keys and they follow it.
 3. You can select more than one row at a time — hold **Ctrl** and click to add or remove individual rows, or hold **Shift** and click to select a run of them. This is only useful for **Cut**; turning edit mode back off collapses the selection to a single row again.
 
@@ -204,6 +204,8 @@ Start Menu can add items to the right-click menu of **Nautilus** (the Files app)
 4. Choose **Edit → Update Nautilus**. The first time, Start Menu offers to restart Nautilus, which it needs in order to load the menu. Restarting closes any open Nautilus windows. Say no and the menu appears the next time Nautilus starts.
 
 Run **Update Nautilus** again whenever you add, rename or remove items in the folder. After the first time, an update takes effect immediately, with no restart. Changes to what an item *does* (its script, working directory, launch mode) need no update at all, since each launch reads the menu file fresh.
+
+To take all of Start Menu's items off Nautilus's menu, choose **Edit → Clear Nautilus**. It takes effect immediately, with no restart, and leaves your `Nautilus` folder untouched; **Update Nautilus** puts the items back.
 
 Nautilus needs its Python extension support for this: `sudo apt install python3-nautilus`. Update Nautilus tells you if it's missing.
 
