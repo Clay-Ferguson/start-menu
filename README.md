@@ -220,14 +220,6 @@ menu:
 - **Requires `python3-nautilus`** (`sudo apt install python3-nautilus`); Update Nautilus says so if it's missing. Nautilus menus have no icons, so `icon:` is not used there.
 - Launched from the Start Menu window, a Nautilus item first asks for its target, with a file picker (titled *Menu Item requires File*) or a folder picker (*Menu Item requires Folder*) as its `target_type` says, then runs just as it would from Nautilus. Cancelling the picker launches nothing.
 
-Recipes for the extras Coral used to build in:
-
-| Item | `target_type` | `launch` | `cwd` | Command |
-|---|---|---|---|---|
-| Copy Full Path | `file`, and the same item again as `folder` | `detached` | `$TARGET_FOLDER` | `sh: printf %s "${TARGET_FILE:-$TARGET_FOLDER}" \| xclip -selection clipboard` (needs `xclip`) |
-| Run Script | `file` | `hold` | `$TARGET_FOLDER` | `file: $TARGET_FILE` |
-| Open Terminal Here | `folder` | `detached` | `$TARGET_FOLDER` | `sh: gnome-terminal --working-directory="$TARGET_FOLDER"` |
-
 Commands run under the same `bash -lc` as every other launch, so `~/.profile` is read but an interactive-only `~/.bashrc` (where nvm usually lives) is not: give such tools their full path, or source what they need in the item.
 
 ### Errors
