@@ -271,6 +271,11 @@ INSTALLED_SIZE="$(du -sk --exclude=DEBIAN "$STAGE" | cut -f1)"
 # window then falls back to Qt's own built-in arrow art and quietly stops
 # matching the rest of the desktop. apt does not pull this in on its own:
 # python3-pyqt6 does not depend on it.
+#
+# fonts-noto-color-emoji is recommended because menu names may start with a
+# color emoji (the way a Nautilus item gets an icon), and __main__ names
+# "Noto Color Emoji" as the app font's fallback: apt's Qt 6.4 won't find an
+# emoji font by itself and draws a box. Ubuntu installs it by default.
 cat > "$STAGE/DEBIAN/control" <<EOF
 Package: $PACKAGE
 Version: $VERSION
@@ -278,7 +283,7 @@ Section: utils
 Priority: optional
 Architecture: $ARCH
 Depends: python3 (>= 3.11), python3-pyqt6, python3-yaml, libqt6svg6
-Recommends: qt6-wayland, x-terminal-emulator
+Recommends: qt6-wayland, x-terminal-emulator, fonts-noto-color-emoji
 Suggests: tmux, python3-nautilus
 Maintainer: $START_MENU_MAINTAINER
 Installed-Size: $INSTALLED_SIZE

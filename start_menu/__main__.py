@@ -36,6 +36,10 @@ from .window import MainWindow, ask_running_session
 # themed icons the .deb installs; a checkout run has only this.
 ICON = os.path.join(DATA_DIR, "start-menu.png")
 
+# The color emoji font Qt 6.4 is pointed at (see main()). The .deb Recommends
+# its package, fonts-noto-color-emoji, which Ubuntu installs by default.
+EMOJI_FONT = "Noto Color Emoji"
+
 # Where the menu lives when no path is given on the command line. A system-wide
 # install (the .deb) puts one desktop entry in front of every user on the
 # machine, so its Exec= line can't carry anyone's personal path — this is what
@@ -145,6 +149,16 @@ def main() -> int:
     app.setDesktopFileName("start-menu")
     if os.path.isfile(ICON):
         app.setWindowIcon(QIcon(ICON))
+    # Names may start with a color emoji ("🔧  VSCode"), the trick that gives a
+    # Nautilus item an icon. Qt 6.9+ (the uv venv) sends emoji to a color
+    # emoji font on its own; Qt 6.4 (the .deb, apt's python3-pyqt6) falls back
+    # by script, never picks the emoji font, and draws a box. Naming it as the
+    # app font's last fallback fixes 6.4 and changes nothing on newer Qt.
+    # Every widget font derives from the app font, so all of them inherit it.
+    # A family that isn't installed is simply skipped.
+    font = app.font()
+    font.setFamilies([*font.families(), EMOJI_FONT])
+    app.setFont(font)
 
     menu_path = os.path.abspath(os.path.expanduser(args.menu_file or DEFAULT_MENU))
 
