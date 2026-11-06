@@ -252,6 +252,7 @@ Runs ruff (`ruff.toml`), pyright over the `start_menu` package (`pyrightconfig.j
 start.sh              launcher (uv run python -m start_menu)
 lint.sh               static checks: ruff, pyright, bash -n
 build.sh              builds the .deb, then offers to install it
+setup.sh              one-time setup of a fresh Ubuntu machine (apt packages, uv, windowchrome)
 packaging/
   build-deb.sh        builds the .deb into dist/
   start-menu.desktop  the desktop entry template

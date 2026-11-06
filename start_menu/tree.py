@@ -26,7 +26,7 @@ from windowchrome import apply_scrollbars
 from . import UI_POINT_SIZE
 from .icons import at_size, edit_icon
 from .menu import LAUNCH_TMUX, MenuNode
-from .style import HIGHLIGHT_BG, HIGHLIGHT_FG, HOVER_BG
+from .style import ARROW_COLOR, HIGHLIGHT_BG, HIGHLIGHT_FG, HOVER_BG
 
 NODE_ROLE = Qt.ItemDataRole.UserRole
 
@@ -70,13 +70,16 @@ class RowActionDelegate(QStyledItemDelegate):
         # sizes and Qt hands back the nearest one rather than the size asked
         # for, so without it these come out at whatever the theme happens to
         # have (16px, most often) instead of ACTION_ICON_SIZE.
+        # The arrows are tinted (see style.ARROW_COLOR); the rest keep their
+        # theme's colors.
+        standard = parent.style().standardIcon
         self._icons = {
-            kind: at_size(icon, ACTION_ICON_SIZE)
-            for kind, icon in (
-                ("edit", edit_icon(ACTION_ICON_SIZE)),
-                ("delete", parent.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon)),
-                ("up", parent.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp)),
-                ("down", parent.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown)),
+            kind: at_size(icon, ACTION_ICON_SIZE, tint)
+            for kind, icon, tint in (
+                ("edit", edit_icon(ACTION_ICON_SIZE), None),
+                ("delete", standard(QStyle.StandardPixmap.SP_TrashIcon), None),
+                ("up", standard(QStyle.StandardPixmap.SP_ArrowUp), ARROW_COLOR),
+                ("down", standard(QStyle.StandardPixmap.SP_ArrowDown), ARROW_COLOR),
             )
         }
 

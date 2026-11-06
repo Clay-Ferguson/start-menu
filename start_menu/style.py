@@ -22,6 +22,10 @@ HIGHLIGHT_FG = "#ffffff"
 # the hover the native style would otherwise have drawn, so it is drawn here
 # instead.
 HOVER_BG = "rgba(158, 75, 46, 56)"
+# The arrows (the header's back button, the rows' move up/down) are recolored
+# to this rather than drawn in whatever the theme ships: Qt's arrow art is
+# black, which all but vanishes on the dark desktop this app runs under.
+ARROW_COLOR = "#c8c8c8"
 
 LABEL_STYLE = f"font-size: {UI_POINT_SIZE}pt;"
 BUTTON_STYLE = f"QPushButton {{ font-size: {UI_POINT_SIZE}pt; padding: 8px 20px; }}"

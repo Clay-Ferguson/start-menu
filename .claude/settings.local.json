@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 *)",
+      "Bash(.venv/bin/python3 -c ' *)",
+      "Bash(.venv/bin/python3.12 *)",
+      "Bash(uv run python -c ' *)",
+      "Bash(uv sync *)",
+      "Bash(uv run *)",
+      "Bash(apt list *)",
+      "Bash(dpkg -l)",
+      "Bash(command -v Xvfb)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(QT_QPA_PLATFORM=offscreen uv run *)",
+      "Bash(.venv/bin/python -c \"import PyQt6\")",
+      "Bash(.venv/bin/python *)",
+      "Bash(env)",
+      "Read(//usr/bin/**)",
+      "Bash(uv --version)",
+      "Bash(QT_QPA_PLATFORM=offscreen .venv/bin/python *)",
+      "Bash(xargs -I{} echo {})"
+    ]
+  }
+}

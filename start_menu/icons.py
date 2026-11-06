@@ -8,7 +8,7 @@ whatever a desktop icon theme happens to ship.
 from __future__ import annotations
 
 from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtGui import QIcon, QPainter, QPixmap
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import QStyle
 
 # The size an icon is pulled out of its theme at, before being handed on at
@@ -57,8 +57,11 @@ def _glyph_icon(glyph: str, size: int) -> QIcon:
     return QIcon(pixmap)
 
 
-def at_size(source: QIcon, size: int) -> QIcon:
+def at_size(source: QIcon, size: int, tint: str | None = None) -> QIcon:
     """`source` re-wrapped so that it really does render at `size` px.
+
+    With `tint`, every opaque pixel is repainted in that color, keeping the
+    icon's shape and antialiasing (its alpha) but not its own colors.
 
     An icon theme ships a handful of fixed sizes and Qt's theme-icon engine
     hands back the nearest one rather than the size asked for — and older Qt
@@ -82,6 +85,8 @@ def at_size(source: QIcon, size: int) -> QIcon:
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
+    if tint is not None:
+        pixmap = _tinted(pixmap, QColor(tint))
     icon = QIcon(pixmap)
     # Register the same picture as the *selected* face too. Left to itself, Qt
     # makes that one up by washing the icon in the palette's Highlight color —
@@ -90,3 +95,17 @@ def at_size(source: QIcon, size: int) -> QIcon:
     # a color nothing else on screen uses, and a different one on each Qt.
     icon.addPixmap(pixmap, QIcon.Mode.Selected)
     return icon
+
+
+def _tinted(source: QPixmap, color: QColor) -> QPixmap:
+    """A copy of `source` with its color replaced by `color`, alpha kept."""
+    pixmap = QPixmap(source)  # copy, so the icon `source` came from is untouched
+    painter = QPainter(pixmap)
+    # SourceIn: the fill lands only where the pixmap is already opaque, and
+    # only as opaque as it already is there.
+    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+    # Device pixels, not `pixmap.rect()`'s logical ones: on a high-DPI screen
+    # the logical rect covers only part of the pixmap. Too large is harmless.
+    painter.fillRect(0, 0, pixmap.width(), pixmap.height(), color)
+    painter.end()
+    return pixmap

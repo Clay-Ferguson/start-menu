@@ -55,7 +55,7 @@ from .nautilus import (
     target_env,
     with_target,
 )
-from .style import HIGHLIGHT_BG, HIGHLIGHT_FG, HOVER_BG
+from .style import ARROW_COLOR, HIGHLIGHT_BG, HIGHLIGHT_FG, HOVER_BG
 from .tree import MenuTreeView
 
 HINTS = "⏎ launch    Esc quit"
@@ -86,7 +86,9 @@ class MainWindow(QWidget):
         # nothing on screen otherwise says how to get back out of a section
         # you clicked your way into.
         self.back_button = QToolButton()
-        self.back_button.setIcon(at_size(back_icon(self.style(), BACK_ICON_SIZE), BACK_ICON_SIZE))
+        self.back_button.setIcon(
+            at_size(back_icon(self.style(), BACK_ICON_SIZE), BACK_ICON_SIZE, ARROW_COLOR)
+        )
         self.back_button.setIconSize(QSize(BACK_ICON_SIZE, BACK_ICON_SIZE))
         self.back_button.setFixedSize(BACK_BUTTON_SIZE, BACK_BUTTON_SIZE)  # a comfortable target
         self.back_button.setAutoRaise(True)  # flat until hovered
