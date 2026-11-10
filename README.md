@@ -182,14 +182,15 @@ For `terminal`, `hold` and `tmux`, the first available terminal emulator is used
 `launch: tmux` runs the script inside a named [tmux](https://github.com/tmux/tmux) session instead of directly in the terminal window. The window only ever runs `tmux attach-session`, so the script's own process belongs to the tmux server rather than to the window — which is the whole point:
 
 - **Closing the window (or `Ctrl+B` then `D`) detaches.** The script keeps running, output and scrollback intact.
-- **Launching the item again asks** whether to **Attach** — reconnect to that same live session, right where you left it — or **Restart** it. The dialog says when the session was started, because that is the thing worth knowing: an attach does *not* re-read the script, so a session started days ago is still running the version of the file it was started with, no matter how many times the script has been edited since. **Restart** ends the session (and everything running in it) and runs the script again from disk.
+- **Launching the item again asks** whether to **Attach** — reconnect to that same live session, right where you left it — **Restart** it, or **Terminate** it. The dialog says when the session was started, because that is the thing worth knowing: an attach does *not* re-read the script, so a session started days ago is still running the version of the file it was started with, no matter how many times the script has been edited since. **Restart** ends the session (and everything running in it) and runs the script again from disk; **Terminate** ends it and runs nothing.
+- **Ending a session is graceful first.** Restart and Terminate send `Ctrl+C` to every pane and give the session up to 3 seconds to exit on its own, so a server gets to shut down cleanly; only what's still running after that is killed (`tmux kill-session`).
 - **If the script has since exited** — cleanly or by crashing — the dead session is cleared and a fresh one started, with no question asked. The pane is kept after the process exits (`remain-on-exit`), so a script that fails on startup leaves its error on screen instead of the window vanishing before you can read it.
 
 `tmux_session:` names the session and is **required** for this mode. It's restricted to letters, digits, `_` and `-`: tmux addresses panes as `session:window.pane`, so a `:` or `.` in the session name would silently aim at the wrong target. The GUI's session field refuses those characters as you type; a hand-edited menu file gets a dialog at launch time instead.
 
 Two items sharing one `tmux_session` name deliberately share the session — the second one attaches to whatever the first one started rather than running its own command. A session that's already attached in another window is simply mirrored, which is tmux's normal behavior.
 
-The name is matched **exactly** (tmux's `=` target prefix). Without that, a `tmux_session: web` would find, attach to — and on a **Restart**, kill — an unrelated `web-staging` session that happened to be running, since a bare tmux target falls back to prefix matching.
+The name is matched **exactly** (tmux's `=` target prefix). Without that, a `tmux_session: web` would find, attach to — and on a **Restart** or **Terminate**, kill — an unrelated `web-staging` session that happened to be running, since a bare tmux target falls back to prefix matching.
 
 tmux must be installed (`sudo apt install tmux`). It's checked before anything is spawned, so a missing tmux is a dialog rather than a terminal window that flashes open and dies.
 

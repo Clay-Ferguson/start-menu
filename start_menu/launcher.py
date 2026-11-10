@@ -45,7 +45,15 @@ TMUX_DEAD = "dead"
 # mode has always done on its own.
 TMUX_ATTACH = "attach"
 TMUX_RESTART = "restart"
+TMUX_TERMINATE = "terminate"
 TMUX_CANCEL = "cancel"
+
+# How long, in seconds, a session gets to exit on its own after Ctrl+C before
+# it is killed outright (see `end_tmux_session`). The GUI waits through it, so
+# it is kept short; most scripts are gone in a fraction of that. What never
+# exits on Ctrl+C — an idle shell in a pane the user split off, a full-screen
+# program that reads the key itself — always costs the whole grace.
+TMUX_INTERRUPT_GRACE = 3.0
 
 
 def launch(
@@ -68,12 +76,15 @@ def launch(
     the last time", never re-reading the script. It is called with
     `(node, session_name, started)` — `started` being a human-readable local
     time, or None if tmux wouldn't say — and answers TMUX_ATTACH (the historic
-    behavior), TMUX_RESTART (kill the session first, so the script runs again
-    from disk) or TMUX_CANCEL (do nothing at all). Left unset, this behaves
-    exactly as it did before: attach.
+    behavior), TMUX_RESTART (end the session first, so the script runs again
+    from disk), TMUX_TERMINATE (end the session and run nothing) or
+    TMUX_CANCEL (do nothing at all). Left unset, this behaves exactly as it
+    did before: attach. Ending a session is graceful first and forced only
+    after that; see `end_tmux_session`.
 
-    A cancelled launch returns None, same as a successful one: nothing ran,
-    but nothing went wrong either, and the caller has nothing to report.
+    A cancelled or terminated launch returns None, same as a successful one:
+    nothing ran, but nothing went wrong either, and the caller has nothing to
+    report.
     """
     if node.is_section:
         return f"'{node.name}' is a section, not a script."
@@ -125,8 +136,13 @@ def launch(
             choice = on_running_session(node, session, tmux_session_started(session))
             if choice == TMUX_CANCEL:
                 return None
+            if choice == TMUX_TERMINATE:
+                error = end_tmux_session(session)
+                if error:
+                    return f"Cannot terminate '{node.name}':\n\n{error}"
+                return None
             if choice == TMUX_RESTART:
-                error = kill_tmux_session(session)
+                error = end_tmux_session(session)
                 if error:
                     return f"Cannot restart '{node.name}':\n\n{error}"
 
@@ -415,6 +431,39 @@ def tmux_session_started(name: str) -> str | None:
         except (ValueError, OSError):
             return None
     return None
+
+
+def end_tmux_session(name: str) -> str | None:
+    """Stop session `name`: Ctrl+C first, kill-session only after that.
+
+    A bare kill-session closes every pane's terminal and sends SIGHUP, which
+    gives a server no chance to shut down cleanly — and a daemon that treats
+    SIGHUP as "reload" can outlive it entirely, running on with no terminal.
+    So every live pane is sent Ctrl+C, exactly as if typed, and given
+    TMUX_INTERRUPT_GRACE to exit. The script's own window has remain-on-exit
+    on, so its pane turns dead rather than vanishing, which is what
+    `tmux_session_state` reads; whatever is left after that is killed.
+
+    A session that is already gone counts as success: it may have ended while
+    the dialog was up, or on the Ctrl+C itself. Error message, or None.
+    """
+    # Panes are addressed by id (%N, unique on the server), not '=' + name:
+    # send-keys takes a target *pane*, where the exact-match session prefix
+    # resolves to nothing — the same trap as display-message.
+    panes = _tmux("list-panes", "-s", "-t", "=" + name, "-F", "#{pane_id} #{pane_dead}")
+    for line in (panes or "").splitlines():
+        pane_id, _, dead = line.partition(" ")
+        if dead != "1":
+            _tmux("send-keys", "-t", pane_id, "C-c")
+    deadline = time.monotonic() + TMUX_INTERRUPT_GRACE
+    while tmux_session_state(name) == TMUX_LIVE and time.monotonic() < deadline:
+        time.sleep(0.1)
+    if tmux_session_state(name) == TMUX_ABSENT:
+        return None
+    error = kill_tmux_session(name)
+    if error and tmux_session_state(name) == TMUX_ABSENT:
+        return None
+    return error
 
 
 def kill_tmux_session(name: str) -> str | None:

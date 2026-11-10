@@ -30,7 +30,7 @@ from . import APP_NAME, UI_POINT_SIZE
 from .folder_dialog import FolderNameDialog
 from .icons import at_size, back_icon
 from .item_dialog import ItemEditDialog
-from .launcher import TMUX_ATTACH, TMUX_CANCEL, TMUX_RESTART, launch
+from .launcher import TMUX_ATTACH, TMUX_CANCEL, TMUX_RESTART, TMUX_TERMINATE, launch
 from .menu import (
     TARGET_ANY_TYPE,
     TARGET_FILE_TYPE,
@@ -729,13 +729,16 @@ class MainWindow(QWidget):
 def ask_running_session(
     parent: QWidget | None, node: MenuNode, session: str, started: str | None
 ) -> str:
-    """Attach to `node`'s already-running tmux session, or restart it?
+    """Attach to `node`'s already-running tmux session, restart it, or end it?
 
     Attaching is what this mode did unconditionally, and it stays the
     default — but it means the script on disk is never read, so an edited
     script appears to have no effect and the session quietly goes on
     running the version it was started with. Saying when it started is the
     point of the dialog: hours or days ago is the tell.
+
+    Terminate is the only way Start Menu offers to stop a session without
+    starting it again; it launches nothing.
 
     A function rather than a MainWindow method because the windowless
     `--nautilus` launch (see __main__) asks it too, with no parent.
@@ -748,18 +751,25 @@ def ask_running_session(
     box.setInformativeText(
         f"{detail}"
         "Attach — reconnect to what's running now.\n"
-        f"Restart — end that session and run '{node.name}' again from scratch."
+        f"Restart — end that session and run '{node.name}' again from scratch.\n"
+        "Terminate — end that session and run nothing."
     )
     attach = box.addButton("Attach", QMessageBox.ButtonRole.AcceptRole)
+    # Terminate is meant to sit furthest from Attach, the default. Qt lays out
+    # buttons of one role in reverse order of adding, so it's added *after*.
     restart = box.addButton("Restart", QMessageBox.ButtonRole.DestructiveRole)
+    terminate = box.addButton("Terminate", QMessageBox.ButtonRole.DestructiveRole)
     box.addButton(QMessageBox.StandardButton.Cancel)
-    box.setDefaultButton(attach)  # the safe one: restarting kills a process
+    # The safe one: restarting or terminating stops a process.
+    box.setDefaultButton(attach)
     box.exec()
     clicked = box.clickedButton()
     if clicked is attach:
         return TMUX_ATTACH
     if clicked is restart:
         return TMUX_RESTART
+    if clicked is terminate:
+        return TMUX_TERMINATE
     return TMUX_CANCEL  # includes closing the dialog outright
 
 
