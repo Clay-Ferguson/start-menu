@@ -27,10 +27,12 @@ DEFAULT_LAUNCH = LAUNCH_TERMINAL
 # What an item in the Nautilus folder is offered on, when right-clicked in
 # Nautilus (see nautilus.py). Meaningless anywhere else in the menu, but
 # accepted on any script so an item keeps its setting when it's moved out
-# of that folder and back.
+# of that folder and back. `any` is offered on both, for a script that just
+# wants the path ($TARGET) whichever it is.
 TARGET_FOLDER_TYPE = "folder"
 TARGET_FILE_TYPE = "file"
-TARGET_TYPES = (TARGET_FOLDER_TYPE, TARGET_FILE_TYPE)
+TARGET_ANY_TYPE = "any"
+TARGET_TYPES = (TARGET_FOLDER_TYPE, TARGET_FILE_TYPE, TARGET_ANY_TYPE)
 DEFAULT_TARGET_TYPE = TARGET_FOLDER_TYPE
 
 SECTION_KEYS = {"folder", "icon", "items"}

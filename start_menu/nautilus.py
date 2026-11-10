@@ -10,8 +10,9 @@ Two halves, joined by a manifest file:
   extension   Runs inside Nautilus. Reads the manifest on every right-click
               and, when one of its items is picked, runs
               `start-menu MENU_FILE --nautilus ITEM TARGET` — a windowless Start
-              Menu that launches that one item with $TARGET_FOLDER (and, for a
-              file, $TARGET_FILE) set; see __main__._run_nautilus_item.
+              Menu that launches that one item with $TARGET, $TARGET_FOLDER
+              (and, for a file, $TARGET_FILE) set; see
+              __main__._run_nautilus_item.
 
 Why a manifest rather than the list baked into the extension: Nautilus loads
 extensions only when it starts, so a changed extension means restarting
@@ -35,7 +36,7 @@ import tempfile
 from dataclasses import dataclass, replace
 
 from . import DATA_DIR
-from .menu import TARGET_FILE_TYPE, TARGET_FOLDER_TYPE, MenuNode
+from .menu import TARGET_ANY_TYPE, TARGET_FILE_TYPE, TARGET_FOLDER_TYPE, MenuNode
 
 # The folder whose items are offered: top level only, named exactly this.
 NAUTILUS_FOLDER = "Nautilus"
@@ -44,14 +45,16 @@ EXTENSION_NAME = "start_menu_nautilus.py"
 EXTENSION_SOURCE = os.path.join(DATA_DIR, EXTENSION_NAME)
 
 # What a launched item is told about the thing that was right-clicked.
+TARGET_VAR = "TARGET"
 TARGET_FOLDER_VAR = "TARGET_FOLDER"
 TARGET_FILE_VAR = "TARGET_FILE"
+_TARGET_VARS = (TARGET_VAR, TARGET_FOLDER_VAR, TARGET_FILE_VAR)
 
-# `$TARGET_FOLDER` or `${TARGET_FOLDER}` (and the same for TARGET_FILE), but
+# `$TARGET_FOLDER` or `${TARGET_FOLDER}` (and the same for the others), but
 # not `$TARGET_FOLDERS` — the name has to end where the shell would end it.
+# That same rule keeps `$TARGET` from matching the start of `$TARGET_FILE`.
 _TARGET_REF_RE = re.compile(
-    r"\$(?:\{(%s|%s)\}|(%s|%s)(?![A-Za-z0-9_]))"
-    % ((TARGET_FOLDER_VAR, TARGET_FILE_VAR) * 2)
+    r"\$(?:\{(%s)\}|(%s)(?![A-Za-z0-9_]))" % (("|".join(_TARGET_VARS),) * 2)
 )
 
 # Where the .deb puts the package and its launcher (see build-deb.sh).
@@ -121,13 +124,26 @@ def find_nautilus_item(nodes: list[MenuNode], name: str, target: str) -> MenuNod
     """The item named `name` that is offered on `target`'s kind (file or folder).
 
     By kind as well as name, so one name can serve both — a "Copy Full Path"
-    for files and another for folders.
+    for files and another for folders. A `target_type: any` item is offered on
+    either kind.
     """
     kind = target_type_of(target)
     for node in nautilus_items(nodes):
-        if node.name == name and node.target_type == kind:
+        if node.name == name and kind in offered_on(node.target_type):
             return node
     return None
+
+
+def offered_on(target_type: str) -> tuple[str, ...]:
+    """The kinds of right-click (folder, file) a `target_type:` is offered on."""
+    if target_type == TARGET_ANY_TYPE:
+        return (TARGET_FOLDER_TYPE, TARGET_FILE_TYPE)
+    return (target_type,)
+
+
+def target_type_label(target_type: str) -> str:
+    """How a `target_type:` reads in a sentence: "folders", "files"."""
+    return " and ".join(f"{kind}s" for kind in offered_on(target_type))
 
 
 def target_type_of(path: str) -> str:
@@ -138,18 +154,20 @@ def target_type_of(path: str) -> str:
 def target_env(path: str) -> dict[str, str]:
     """The variables an item launched on `path` is given.
 
-    A folder gets $TARGET_FOLDER. A file gets $TARGET_FILE, and its parent as
-    $TARGET_FOLDER too, so `cwd: $TARGET_FOLDER` works for either kind; a
-    script tells the two apart by whether $TARGET_FILE is set.
+    $TARGET is always the path itself, for a script that doesn't care which
+    kind it is (the point of `target_type: any`). A folder also gets
+    $TARGET_FOLDER. A file gets $TARGET_FILE, and its parent as $TARGET_FOLDER
+    too, so `cwd: $TARGET_FOLDER` works for either kind; a script tells the
+    two apart by whether $TARGET_FILE is set.
     """
     path = os.path.abspath(path)
     if os.path.isdir(path):
-        return {TARGET_FOLDER_VAR: path}
-    return {TARGET_FILE_VAR: path, TARGET_FOLDER_VAR: os.path.dirname(path)}
+        return {TARGET_VAR: path, TARGET_FOLDER_VAR: path}
+    return {TARGET_VAR: path, TARGET_FILE_VAR: path, TARGET_FOLDER_VAR: os.path.dirname(path)}
 
 
 def with_target(node: MenuNode, env: dict[str, str]) -> MenuNode:
-    """`node` with $TARGET_FOLDER/$TARGET_FILE filled in to its `cwd:` and `file:`.
+    """`node` with $TARGET/$TARGET_FOLDER/$TARGET_FILE filled in to its `cwd:` and `file:`.
 
     So `cwd: $TARGET_FOLDER` runs in the clicked folder and `file: $TARGET_FILE`
     runs the clicked file. Substituted here, not put into this process's
@@ -189,12 +207,13 @@ def publish(menu_path: str, nodes: list[MenuNode]) -> PublishResult:
 
     Items are found again by name and target type when one is picked (see
     `find_nautilus_item`), so two sharing both would be ambiguous: that is
-    refused (PublishError) before anything is written. No Nautilus folder at
+    refused (PublishError) before anything is written. A `target_type: any`
+    item takes its name for files and for folders alike. No Nautilus folder at
     all publishes an empty list, which takes Start Menu's items back off
     Nautilus's menu. Raises OSError if a file can't be written.
     """
     items = nautilus_items(nodes)
-    keys = [(item.name, item.target_type) for item in items]
+    keys = [(item.name, kind) for item in items for kind in offered_on(item.target_type)]
     duplicates = sorted({key for key in keys if keys.count(key) > 1})
     if duplicates:
         listed = "\n".join(f'  • "{name}" (for {kind}s)' for name, kind in duplicates)

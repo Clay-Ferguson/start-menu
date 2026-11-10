@@ -32,7 +32,9 @@ from .icons import at_size, back_icon
 from .item_dialog import ItemEditDialog
 from .launcher import TMUX_ATTACH, TMUX_CANCEL, TMUX_RESTART, launch
 from .menu import (
+    TARGET_ANY_TYPE,
     TARGET_FILE_TYPE,
+    TARGET_FOLDER_TYPE,
     MenuError,
     MenuNode,
     Options,
@@ -53,6 +55,7 @@ from .nautilus import (
     python_nautilus_available,
     restart_nautilus,
     target_env,
+    target_type_label,
     with_target,
 )
 from .style import ARROW_COLOR, HIGHLIGHT_BG, HIGHLIGHT_FG, HOVER_BG
@@ -295,9 +298,17 @@ class MainWindow(QWidget):
 
         Starts where the last pick ended, so trying an item on a few targets
         in a row doesn't mean navigating back each time.
+
+        A `target_type: any` item asks which kind first: Qt has no one picker
+        that chooses either a file or a folder.
         """
         start = self._last_target_dir or os.path.expanduser("~")
-        if node.target_type == TARGET_FILE_TYPE:
+        kind = node.target_type
+        if kind == TARGET_ANY_TYPE:
+            kind = self._ask_target_kind(node)
+            if kind is None:
+                return None
+        if kind == TARGET_FILE_TYPE:
             path, _ = QFileDialog.getOpenFileName(self, "Menu Item requires File", start)
         else:
             path = QFileDialog.getExistingDirectory(self, "Menu Item requires Folder", start)
@@ -305,6 +316,24 @@ class MainWindow(QWidget):
             return None
         self._last_target_dir = path if os.path.isdir(path) else os.path.dirname(path)
         return path
+
+    def _ask_target_kind(self, node: MenuNode) -> str | None:
+        """File or folder, for a Nautilus item offered on both. None if cancelled."""
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle(f"{APP_NAME} — Menu Item requires File or Folder")
+        box.setText(f"Run '{node.name}' on a file or on a folder?")
+        file_button = box.addButton("File…", QMessageBox.ButtonRole.AcceptRole)
+        folder_button = box.addButton("Folder…", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton(QMessageBox.StandardButton.Cancel)
+        box.setDefaultButton(file_button)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is file_button:
+            return TARGET_FILE_TYPE
+        if clicked is folder_button:
+            return TARGET_FOLDER_TYPE
+        return None  # includes closing the dialog outright
 
     def _handle_edit_icon(self, index: QModelIndex) -> None:
         """The row's edit icon was clicked: open the dialog for its kind."""
@@ -504,7 +533,9 @@ class MainWindow(QWidget):
 
         title = f"{APP_NAME} — Nautilus updated"
         if result.items:
-            names = "\n".join(f"  • {item.name} ({item.target_type}s)" for item in result.items)
+            names = "\n".join(
+                f"  • {item.name} ({target_type_label(item.target_type)})" for item in result.items
+            )
             summary = f"Nautilus's right-click menu now offers:\n\n{names}"
         elif nautilus_folder(self.nodes) is None:
             summary = (

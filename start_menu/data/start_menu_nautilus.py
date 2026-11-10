@@ -12,7 +12,7 @@ without restarting Nautilus. Picking an item runs Start Menu itself, windowless:
 
     <command> MENU_FILE --nautilus ITEM TARGET
 
-which launches that item the way the Start Menu window would, with
+which launches that item the way the Start Menu window would, with $TARGET,
 $TARGET_FOLDER (and for a file, $TARGET_FILE) set to what was right-clicked.
 
 Derived from Coral's coral_action.py; its structure is kept where it applies.
@@ -46,7 +46,8 @@ class StartMenuNautilusItems(GObject.GObject, Nautilus.MenuProvider):
         """Menu items for a right-clicked file or folder.
 
         Only for a single selection, as in Coral: an item runs on one target.
-        Each item is offered on folders or on files, as its `target_type` says.
+        Each item is offered on folders, on files, or on both ("any"), as its
+        `target_type` says.
         """
         if len(files) != 1:
             return []
@@ -66,7 +67,7 @@ class StartMenuNautilusItems(GObject.GObject, Nautilus.MenuProvider):
             if not isinstance(entry, dict):
                 continue
             name = entry.get("name")
-            if not name or entry.get("target_type", "folder") != wanted:
+            if not name or entry.get("target_type", "folder") not in (wanted, "any"):
                 continue
             item = Nautilus.MenuItem(
                 # Numbered rather than named: a name may hold anything.

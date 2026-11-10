@@ -39,6 +39,7 @@ from .menu import (
     LAUNCH_MODES,
     LAUNCH_TERMINAL,
     LAUNCH_TMUX,
+    TARGET_ANY_TYPE,
     TARGET_FILE_TYPE,
     TARGET_FOLDER_TYPE,
     TARGET_TYPES,
@@ -67,6 +68,7 @@ LAUNCH_LABELS = {
 TARGET_TYPE_LABELS = {
     TARGET_FOLDER_TYPE: "Folders ($TARGET_FOLDER)",
     TARGET_FILE_TYPE: "Files ($TARGET_FILE)",
+    TARGET_ANY_TYPE: "Files & Folders ($TARGET)",
 }
 
 # Same restriction launcher.py enforces on a hand-edited menu file; here it
@@ -264,7 +266,7 @@ class ItemEditDialog(QDialog):
         )
 
         # Which right-clicks in Nautilus offer this item, and so which of
-        # $TARGET_FOLDER/$TARGET_FILE it can count on.
+        # $TARGET_FOLDER/$TARGET_FILE/$TARGET it can count on.
         target_label = QLabel("Show in Nautilus on:")
         target_label.setStyleSheet(LABEL_STYLE)
         self._target_combo = QComboBox()

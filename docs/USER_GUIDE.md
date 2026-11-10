@@ -129,7 +129,7 @@ This dialog is used both to create a new launchable item and to edit an existing
 - **Working directory** — a text field for the folder the item runs from, plus a **Pick Folder…** button that opens a standard folder-browser dialog so you don't have to type the path by hand. This applies whether the item is a **File** or a **Bash script**, and is required — see [Working Directory](#working-directory-cwd) below.
 - **Launch** — a dropdown choosing how the item runs, with the same four modes described in [Launching an Item](#launching-an-item): *Detached (no window)*, *Terminal (terminal auto-closes)*, *Hold (terminal stays open)*, and *Tmux (session keeps running)*.
 - **Tmux session name** — a text field that appears **only** when the launch mode is set to *Tmux*, naming the session the item attaches to. It accepts letters, digits, `_` and `-` only; other characters simply won't type. See [Tmux Sessions](#tmux-sessions).
-- **Show in Nautilus on** — a dropdown that appears **only** for items in the `Nautilus` folder: *Folders* or *Files*, the kind of thing the item is offered on when right-clicked in Nautilus. See [Nautilus Integration](#nautilus-integration).
+- **Show in Nautilus on** — a dropdown that appears **only** for items in the `Nautilus` folder: *Folders*, *Files*, or *Files & Folders*, the kind of thing the item is offered on when right-clicked in Nautilus. See [Nautilus Integration](#nautilus-integration).
 
 **Save** stays disabled until the Name field, the selected content field (File path or Bash script text), and the Working directory field all have something in them — plus the Tmux session name, if the Tmux launch mode is selected. An item can't be saved half-finished. **Cancel** discards whatever you've typed and closes the dialog without changing anything.
 
@@ -200,7 +200,7 @@ Start Menu can add items to the right-click menu of **Nautilus** (the Files app)
 
 1. Create a folder at the **top level** of the menu named exactly **`Nautilus`** (Edit → New Folder).
 2. Put the items you want in Nautilus directly inside it, with Edit → New Item as usual. Folders inside it are ignored.
-3. For each item, choose **Show in Nautilus on**: *Folders* (the default) or *Files*.
+3. For each item, choose **Show in Nautilus on**: *Folders* (the default), *Files*, or *Files & Folders*.
 4. Choose **Edit → Update Nautilus**. The first time, Start Menu offers to restart Nautilus, which it needs in order to load the menu. Restarting closes any open Nautilus windows. Say no and the menu appears the next time Nautilus starts.
 
 Run **Update Nautilus** again whenever you add, rename or remove items in the folder. After the first time, an update takes effect immediately, with no restart. Changes to what an item *does* (its script, working directory, launch mode) need no update at all, since each launch reads the menu file fresh.
@@ -213,18 +213,20 @@ Nautilus needs its Python extension support for this: `sudo apt install python3-
 
 When an item runs from Nautilus, it gets the right-clicked path in environment variables:
 
-| Right-clicked | `$TARGET_FOLDER` | `$TARGET_FILE` |
-|---|---|---|
-| a folder | that folder | *(not set)* |
-| a file | the folder the file is in | that file |
+| Right-clicked | `$TARGET` | `$TARGET_FOLDER` | `$TARGET_FILE` |
+|---|---|---|---|
+| a folder | that folder | that folder | *(not set)* |
+| a file | that file | the folder the file is in | that file |
+
+`$TARGET` is meant for *Files & Folders* items that just want the path, whichever it is. Such an item can still tell the two apart: `$TARGET_FILE` is set only for a file.
 
 Use them in a Bash script (`code "$TARGET_FOLDER"`), or in a script file, which inherits them. They are also filled in when they appear in the item's own **Working directory** or **File** field. Those fields accept them with or without shell-style quotes, so `$TARGET_FOLDER` and `"$TARGET_FOLDER"` both work. `$TARGET_FOLDER` as the working directory runs the item in the right-clicked folder (or the clicked file's folder), and `$TARGET_FILE` as the File runs the right-clicked file itself.
 
 Every launch mode works from Nautilus just as it does from the Start Menu window, including *Hold* and *Tmux*. If something goes wrong, for example the item was renamed and Nautilus's menu not yet updated, Start Menu shows a dialog.
 
-Nautilus only shows these items when a **single** file or folder is right-clicked, and adds nothing to the menu you get by right-clicking empty space. Its menus have no icons, so an item's `icon:` isn't shown there; an emoji at the start of the name works instead. One name can be used at most once for *Folders* and once for *Files*.
+Nautilus only shows these items when a **single** file or folder is right-clicked, and adds nothing to the menu you get by right-clicking empty space. Its menus have no icons, so an item's `icon:` isn't shown there; an emoji at the start of the name works instead. One name can be used at most once for *Folders* and once for *Files*; a *Files & Folders* item counts as both.
 
-You can also launch a Nautilus item from the Start Menu window itself, which is handy for trying one out. Since nothing was right-clicked, Start Menu first asks you to choose the target: a file picker titled *Menu Item requires File* for a *Files* item, or a folder picker titled *Menu Item requires Folder* for a *Folders* item. The item then runs exactly as if you had right-clicked your choice in Nautilus. Cancel the picker and nothing runs. Each picker opens where your previous choice was.
+You can also launch a Nautilus item from the Start Menu window itself, which is handy for trying one out. Since nothing was right-clicked, Start Menu first asks you to choose the target: a file picker titled *Menu Item requires File* for a *Files* item, or a folder picker titled *Menu Item requires Folder* for a *Folders* item. A *Files & Folders* item first asks which of the two you want. The item then runs exactly as if you had right-clicked your choice in Nautilus. Cancel the picker and nothing runs. Each picker opens where your previous choice was.
 
 ### Examples
 
@@ -257,6 +259,14 @@ You can also launch a Nautilus item from the Start Menu window itself, which is 
         launch: detached
         cwd: $TARGET_FOLDER
         sh: printf %s "$TARGET_FOLDER" | xclip -selection clipboard
+
+      - name: Properties              # files and folders alike
+        target_type: any
+        launch: hold
+        cwd: $TARGET_FOLDER
+        sh: |
+          if [ -n "$TARGET_FILE" ]; then file "$TARGET"; fi
+          du -sh "$TARGET"
 ```
 
 ## Opening the Menu File Directly
@@ -318,7 +328,7 @@ menu:
 | `launch` | script | `detached`, `terminal`, `hold`, or `tmux` (see [Launching an Item](#launching-an-item)); defaults to `terminal` |
 | `cwd` | script | Working directory to run in. Required — see [Working Directory](#working-directory-cwd) |
 | `tmux_session` | script | Name of the tmux session to use. Required when `launch: tmux`, ignored otherwise — see [Tmux Sessions](#tmux-sessions) |
-| `target_type` | script | `folder` (the default) or `file`: what the item is offered on in Nautilus. Only used inside the `Nautilus` folder — see [Nautilus Integration](#nautilus-integration) |
+| `target_type` | script | `folder` (the default), `file`, or `any` (both): what the item is offered on in Nautilus. Only used inside the `Nautilus` folder — see [Nautilus Integration](#nautilus-integration) |
 | `icon` | folder or script | An icon theme name, or a path to an image file |
 | `options.editor` | top-level setting | The shell command the item editor's **Edit** button opens a script file with; may include arguments (e.g. `code -n`). Falls back to `$VISUAL`, `$EDITOR`, then your desktop's default handler |
 

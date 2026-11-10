@@ -152,7 +152,7 @@ menu:
 | `launch` | script | no | How to run it (see below). Default `terminal` |
 | `cwd` | script | yes | Working directory to run in. `~` and `$VARS` are expanded; `cwd: ~` on its own means your home folder. There is no default — an item with no `cwd:`, or one pointing at a folder that no longer exists, fails with a dialog when you try to launch it, rather than at startup |
 | `tmux_session` | script | with `launch: tmux` | Name of the tmux session to create or reattach to. Letters, digits, `_` and `-` only (see [Tmux sessions](#tmux-sessions)). Like `cwd:`, a missing or malformed one is reported when you launch, not at startup |
-| `target_type` | script | no | `folder` or `file`: which right-clicks in Nautilus offer the item. Only means anything inside the `Nautilus` folder (see [Nautilus integration](#nautilus-integration)). Default `folder` |
+| `target_type` | script | no | `folder`, `file` or `any` (both): which right-clicks in Nautilus offer the item. Only means anything inside the `Nautilus` folder (see [Nautilus integration](#nautilus-integration)). Default `folder` |
 | `icon` | all | no | An icon theme name (`utilities-terminal`) or a path to an image file. Defaults to a folder icon for sections, a file icon for scripts |
 
 ### Inline `sh:` snippets
@@ -213,13 +213,13 @@ menu:
         file: $TARGET_FILE
 ```
 
-- **`target_type:`** decides where an item is offered: `folder` (the default) on folders, `file` on files. Nothing is added to the empty-space menu, and nothing is offered when more than one thing is selected. Names must be unique within each kind; one name can be used once for files and once for folders.
-- **What the item is told.** A folder sets `$TARGET_FOLDER`. A file sets `$TARGET_FILE`, plus its parent folder as `$TARGET_FOLDER`, so `cwd: $TARGET_FOLDER` works for both. Both variables are available to the script in every launch mode (tmux included). They are also substituted into the item's own `cwd:` and `file:`, as above. Quoting them there (`"$TARGET_FOLDER"`, as you would in a script) is fine: a `cwd:` or `file:` wrapped in one pair of matching quotes has them removed.
+- **`target_type:`** decides where an item is offered: `folder` (the default) on folders, `file` on files, `any` on both. Nothing is added to the empty-space menu, and nothing is offered when more than one thing is selected. Names must be unique within each kind; one name can be used once for files and once for folders, and an `any` item uses its name up for both.
+- **What the item is told.** `$TARGET` is always the right-clicked path itself, file or folder. A folder also sets `$TARGET_FOLDER`. A file sets `$TARGET_FILE`, plus its parent folder as `$TARGET_FOLDER`, so `cwd: $TARGET_FOLDER` works for both; an `any` item tells the two apart by whether `$TARGET_FILE` is set. All three variables are available to the script in every launch mode (tmux included). They are also substituted into the item's own `cwd:` and `file:`, as above. Quoting them there (`"$TARGET_FOLDER"`, as you would in a script) is fine: a `cwd:` or `file:` wrapped in one pair of matching quotes has them removed.
 - **How it runs.** Picking an item runs Start Menu itself with no window — `start-menu MENU_FILE --nautilus ITEM TARGET` — which launches the item exactly as the window would, with its own launch mode. Any problem (the item was renamed since the last update, a bad `cwd:`, …) is a dialog.
 - **Update Nautilus** installs a small extension (`start_menu_nautilus.py`) into `~/.local/share/nautilus-python/extensions/`, and writes the item list to `~/.local/share/start-menu/nautilus.json`. The extension reads that list on every right-click, so later updates take effect at once. The very first update, or one after the extension itself has changed, needs Nautilus restarted, and Start Menu offers to do it (`nautilus -q`, which closes open Nautilus windows). Run it again whenever you add, rename or remove items in the folder.
 - **Clear Nautilus** undoes it: deletes the manifest and the installed extension. The items vanish at the next right-click (no restart), and the `Nautilus` folder itself is left alone.
 - **Requires `python3-nautilus`** (`sudo apt install python3-nautilus`); Update Nautilus says so if it's missing. Nautilus menus have no icons, so `icon:` is not used there.
-- Launched from the Start Menu window, a Nautilus item first asks for its target, with a file picker (titled *Menu Item requires File*) or a folder picker (*Menu Item requires Folder*) as its `target_type` says, then runs just as it would from Nautilus. Cancelling the picker launches nothing.
+- Launched from the Start Menu window, a Nautilus item first asks for its target, with a file picker (titled *Menu Item requires File*) or a folder picker (*Menu Item requires Folder*) as its `target_type` says (an `any` item first asks which of the two), then runs just as it would from Nautilus. Cancelling the picker launches nothing.
 
 Commands run under the same `bash -lc` as every other launch, so `~/.profile` is read but an interactive-only `~/.bashrc` (where nvm usually lives) is not: give such tools their full path, or source what they need in the item.
 
@@ -262,7 +262,7 @@ start_menu/
                       and the windowless --nautilus launch
   menu.py             YAML -> MenuNode tree, with validation, and the tree edits
   launcher.py         the four launch modes, and opening a file in the editor
-  nautilus.py         the Nautilus folder: publishing it, and the $TARGET_* variables
+  nautilus.py         the Nautilus folder: publishing it, and the $TARGET variables
   window.py           MainWindow: menu bar, header, footer, every edit and save
   tree.py             MenuTreeView: the one-level-at-a-time menu itself
   icons.py            where icons come from, and making them the size asked for
