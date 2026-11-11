@@ -19,7 +19,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QRadioButton,
@@ -28,9 +27,9 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from windowchrome import apply_radios, apply_scrollbars
+from windowchrome import apply_frame, apply_radios, apply_scrollbars
 
-from . import UI_POINT_SIZE
+from . import UI_POINT_SIZE, messages
 from .launcher import open_in_editor
 from .menu import (
     DEFAULT_LAUNCH,
@@ -50,6 +49,7 @@ from .menu import (
 from .style import (
     BUTTON_STYLE,
     LABEL_STYLE,
+    SCROLLBAR_HANDLE,
     field_background,
     field_border,
     field_style,
@@ -118,6 +118,7 @@ class ItemEditDialog(QDialog):
         self.setWindowTitle(title)
         self.setModal(True)
         self.resize(680, 700)
+        apply_frame(self)  # windowchrome's title bar and border (README §13)
         self._editor = editor
 
         if node is None:
@@ -197,7 +198,7 @@ class ItemEditDialog(QDialog):
         # background, since it is not the palette's Base `apply_scrollbars`
         # would otherwise assume and the groove would read as a darker stripe
         # against it. Both bars: NoWrap means the horizontal one really appears.
-        apply_scrollbars(self._sh_edit, sh_background)
+        apply_scrollbars(self._sh_edit, sh_background, SCROLLBAR_HANDLE)
         metrics = QFontMetrics(mono_font)
         self._sh_edit.setMinimumSize(
             metrics.horizontalAdvance("M") * SH_EDITOR_COLUMNS + 24,
@@ -381,7 +382,7 @@ class ItemEditDialog(QDialog):
         resolved = resolve_file(path, self._cwd_edit.text().strip() or None)
         error = open_in_editor(resolved, self._editor)
         if error:
-            QMessageBox.critical(self, "Cannot edit file", error)
+            messages.critical(self, "Cannot edit file", error)
 
     def _validate(self) -> None:
         # A blank name, a blank file/sh for whichever type is selected, or a

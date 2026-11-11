@@ -24,9 +24,9 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from windowchrome import ToggleSwitch
+from windowchrome import ToggleSwitch, apply_frame
 
-from . import APP_NAME, UI_POINT_SIZE
+from . import APP_NAME, UI_POINT_SIZE, messages
 from .folder_dialog import FolderNameDialog
 from .icons import at_size, back_icon
 from .item_dialog import ItemEditDialog
@@ -82,7 +82,6 @@ class MainWindow(QWidget):
         self._last_target_dir: str | None = None
 
         self.setWindowTitle(APP_NAME)
-        self.resize(560, 640)
 
         # The header bar: a back arrow, then the breadcrumb. The arrow is the
         # mouse-only equivalent of Left — the app is keyboard-first, but
@@ -202,6 +201,13 @@ class MainWindow(QWidget):
         layout.addWidget(self.tree, 1)
         layout.addWidget(footer)
 
+        # windowchrome draws the title bar and border (README §13) in place of
+        # the system's, which on a dark desktop is as dark as the window and
+        # sets nothing apart. The bar is inside the window, so it is added to
+        # the height: the menu keeps the room it had under the system's bar.
+        frame = apply_frame(self)
+        self.resize(560, 640 + frame.title_bar.height())
+
         # A shortcut rather than keyPressEvent, so Esc closes the window
         # whichever widget has the focus.
         QShortcut(QKeySequence("Esc"), self).activated.connect(self.close)
@@ -291,7 +297,7 @@ class MainWindow(QWidget):
             node, on_running_session=partial(ask_running_session, self), exports=exports
         )
         if error:
-            QMessageBox.critical(self, f"{APP_NAME} — launch failed", error)
+            messages.critical(self, f"{APP_NAME} — launch failed", error)
 
     def _pick_nautilus_target(self, node: MenuNode) -> str | None:
         """Ask for the file or folder a Nautilus item needs. None if cancelled.
@@ -327,6 +333,7 @@ class MainWindow(QWidget):
         folder_button = box.addButton("Folder…", QMessageBox.ButtonRole.AcceptRole)
         box.addButton(QMessageBox.StandardButton.Cancel)
         box.setDefaultButton(file_button)
+        apply_frame(box)
         box.exec()
         clicked = box.clickedButton()
         if clicked is file_button:
@@ -376,7 +383,7 @@ class MainWindow(QWidget):
         if siblings is self.nodes and len(siblings) == 1:
             # menu.py requires the top-level menu to keep at least one item;
             # a section, unlike the top level, is allowed to end up empty.
-            QMessageBox.warning(
+            messages.warning(
                 self, f"{APP_NAME} — cannot delete", "The menu can't be left with no items at all."
             )
             return
@@ -385,7 +392,7 @@ class MainWindow(QWidget):
             if node.is_section and node.children
             else ""
         )
-        reply = QMessageBox.question(
+        reply = messages.question(
             self,
             "Delete",
             f'Delete "{node.name}"?{detail}',
@@ -448,7 +455,7 @@ class MainWindow(QWidget):
         folders = [node for node in selected if node.is_section]
         if folders:
             names = ", ".join(f'"{node.name}"' for node in folders)
-            QMessageBox.warning(
+            messages.warning(
                 self,
                 f"{APP_NAME} — cannot cut",
                 f"Folders can't be cut and pasted — only items can.\n\n"
@@ -523,10 +530,10 @@ class MainWindow(QWidget):
         try:
             result = publish(self.menu_path, self.nodes)
         except PublishError as exc:
-            QMessageBox.warning(self, f"{APP_NAME} — cannot update Nautilus", str(exc))
+            messages.warning(self, f"{APP_NAME} — cannot update Nautilus", str(exc))
             return
         except OSError as exc:
-            QMessageBox.critical(
+            messages.critical(
                 self, f"{APP_NAME} — cannot update Nautilus", f"Could not write:\n\n{exc}"
             )
             return
@@ -553,14 +560,14 @@ class MainWindow(QWidget):
                 "is not installed. Install it with:\n\n  sudo apt install python3-nautilus\n\n"
                 "then restart Nautilus (nautilus -q)."
             )
-            QMessageBox.warning(self, title, summary)
+            messages.warning(self, title, summary)
             return
         if not result.extension_changed:
-            QMessageBox.information(self, title, summary)
+            messages.information(self, title, summary)
             return
 
         # A new or changed extension is only loaded when Nautilus starts.
-        reply = QMessageBox.question(
+        reply = messages.question(
             self,
             title,
             f"{summary}\n\n"
@@ -573,9 +580,9 @@ class MainWindow(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             error = restart_nautilus()
             if error:
-                QMessageBox.critical(self, f"{APP_NAME} — cannot restart Nautilus", error)
+                messages.critical(self, f"{APP_NAME} — cannot restart Nautilus", error)
         else:
-            QMessageBox.information(
+            messages.information(
                 self,
                 title,
                 "The new menu appears the next time Nautilus starts — after "
@@ -589,7 +596,7 @@ class MainWindow(QWidget):
         and Update Nautilus offers them again.
         """
         title = f"{APP_NAME} — Clear Nautilus"
-        reply = QMessageBox.question(
+        reply = messages.question(
             self,
             title,
             f"Remove all of {APP_NAME}'s items from Nautilus's right-click menu?\n\n"
@@ -603,9 +610,9 @@ class MainWindow(QWidget):
         try:
             removed = clear()
         except OSError as exc:
-            QMessageBox.critical(self, title, f"Could not remove:\n\n{exc}")
+            messages.critical(self, title, f"Could not remove:\n\n{exc}")
             return
-        QMessageBox.information(
+        messages.information(
             self,
             title,
             f"{APP_NAME}'s items were removed from Nautilus's right-click menu."
@@ -670,7 +677,7 @@ class MainWindow(QWidget):
         # and silently throw the edit away, so the file wins instead: this
         # change is dropped and the window picks up what's on disk.
         if _mtime(self.menu_path) != self._menu_mtime:
-            QMessageBox.warning(
+            messages.warning(
                 self,
                 f"{APP_NAME} — menu file changed",
                 f"{self.menu_path} was changed outside {APP_NAME}.\n\n"
@@ -685,7 +692,7 @@ class MainWindow(QWidget):
         try:
             dump_menu(self.menu_path, self.nodes, self.options)
         except OSError as exc:
-            QMessageBox.critical(
+            messages.critical(
                 self,
                 f"{APP_NAME} — cannot save menu",
                 f"Could not write {self.menu_path}:\n\n{exc}",
@@ -712,10 +719,10 @@ class MainWindow(QWidget):
         try:
             nodes, options, errors = load_menu(self.menu_path)
         except MenuError as exc:
-            QMessageBox.critical(self, f"{APP_NAME} — cannot reload menu", str(exc))
+            messages.critical(self, f"{APP_NAME} — cannot reload menu", str(exc))
             return False
         if errors:
-            QMessageBox.critical(
+            messages.critical(
                 self, f"{APP_NAME} — cannot reload menu", format_errors(self.menu_path, errors)
             )
             return False
@@ -762,6 +769,7 @@ def ask_running_session(
     box.addButton(QMessageBox.StandardButton.Cancel)
     # The safe one: restarting or terminating stops a process.
     box.setDefaultButton(attach)
+    apply_frame(box)
     box.exec()
     clicked = box.clickedButton()
     if clicked is attach:

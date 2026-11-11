@@ -26,7 +26,7 @@ from windowchrome import apply_scrollbars
 from . import UI_POINT_SIZE
 from .icons import at_size, edit_icon
 from .menu import LAUNCH_TMUX, MenuNode
-from .style import ARROW_COLOR, HIGHLIGHT_BG, HIGHLIGHT_FG, HOVER_BG
+from .style import ARROW_COLOR, HIGHLIGHT_BG, HIGHLIGHT_FG, HOVER_BG, SCROLLBAR_HANDLE
 
 NODE_ROLE = Qt.ItemDataRole.UserRole
 
@@ -150,7 +150,7 @@ class MenuTreeView(QTreeView):
         # `apply_scrollbars` assumes. It goes on the view's scroll bar children,
         # so `_stylesheet()` below can keep being re-applied to the view itself
         # (edit mode toggles it) without disturbing the bars.
-        apply_scrollbars(self)
+        apply_scrollbars(self, handle=SCROLLBAR_HANDLE)
         self.setItemDelegate(RowActionDelegate(self))
         self.doubleClicked.connect(self._activate)
 

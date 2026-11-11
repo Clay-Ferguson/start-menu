@@ -19,7 +19,7 @@ The menu file's path is optional. With no argument Start Menu uses `~/.config/st
 
 ### The `windowchrome` sibling project
 
-Start Menu's wide scroll bars, enlarged radio buttons and **Edit** toggle switch come from **[windowchrome](https://github.com/Clay-Ferguson/windowchrome)**, a small reusable PyQt6 library kept in its own repository so several apps can share the same look. It is **not on PyPI**: `pyproject.toml` resolves it by path, from a directory sitting *beside* this one.
+Start Menu's title bar and window frame, wide scroll bars, enlarged radio buttons and **Edit** toggle switch come from **[windowchrome](https://github.com/Clay-Ferguson/windowchrome)**, a small reusable PyQt6 library kept in its own repository so several apps can share the same look. It is **not on PyPI**: `pyproject.toml` resolves it by path, from a directory sitting *beside* this one.
 
 ```bash
 cd ..                      # the directory holding start-menu/

@@ -10,9 +10,9 @@ import traceback
 from functools import partial
 
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QApplication
 
-from . import APP_NAME, DATA_DIR
+from . import APP_NAME, DATA_DIR, messages
 from .launcher import launch
 from .menu import (
     LAUNCH_HOLD,
@@ -102,7 +102,7 @@ def _report_unhandled(kind, value, trace) -> None:
     # The tail of the traceback, where the failing line is: a desktop launch
     # has no terminal for the stderr copy above to reach.
     tail = "\n".join(text.rstrip().splitlines()[-TRACEBACK_LINES:])
-    QMessageBox.critical(
+    messages.critical(
         None,
         f"{APP_NAME} — internal error",
         f"Something went wrong inside {APP_NAME}. The window should still "
@@ -170,7 +170,7 @@ def main() -> int:
         try:
             _create_menu_file(menu_path)
         except OSError as exc:
-            QMessageBox.critical(
+            messages.critical(
                 None, f"{APP_NAME} — cannot start", f"Could not create {menu_path}:\n\n{exc}"
             )
             return 1
@@ -192,10 +192,10 @@ def _load_or_report(menu_path: str, title: str) -> tuple[list[MenuNode], Options
     try:
         nodes, options, errors = load_menu(menu_path)
     except MenuError as exc:
-        QMessageBox.critical(None, title, str(exc))
+        messages.critical(None, title, str(exc))
         return None
     if errors:
-        QMessageBox.critical(None, title, format_errors(menu_path, errors))
+        messages.critical(None, title, format_errors(menu_path, errors))
         return None
     return nodes, options
 
@@ -213,7 +213,7 @@ def _run_nautilus_item(menu_path: str, name: str, target: str) -> int:
     """
     title = f"{APP_NAME} — cannot run '{name}'"
     if not os.path.exists(target):
-        QMessageBox.critical(None, title, f"{target}\n\nNo such file or folder.")
+        messages.critical(None, title, f"{target}\n\nNo such file or folder.")
         return 1
     loaded = _load_or_report(menu_path, title)
     if loaded is None:
@@ -222,7 +222,7 @@ def _run_nautilus_item(menu_path: str, name: str, target: str) -> int:
 
     node = find_nautilus_item(nodes, name, target)
     if node is None:
-        QMessageBox.critical(
+        messages.critical(
             None,
             title,
             f"There is no item named '{name}' for {target_type_of(target)}s in the "
@@ -240,7 +240,7 @@ def _run_nautilus_item(menu_path: str, name: str, target: str) -> int:
         exports=env,
     )
     if error:
-        QMessageBox.critical(None, f"{APP_NAME} — launch failed", error)
+        messages.critical(None, f"{APP_NAME} — launch failed", error)
         return 1
     return 0
 

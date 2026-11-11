@@ -5,21 +5,14 @@ from __future__ import annotations
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
-    QFrame,
     QLabel,
     QLineEdit,
     QVBoxLayout,
     QWidget,
 )
+from windowchrome import apply_frame
 
 from .style import BUTTON_STYLE, LABEL_STYLE, field_style
-
-# This dialog is small enough that its outer edge is easy to lose against the
-# desktop behind it, so its content sits inside a bordered QFrame — a QDialog
-# won't reliably paint a stylesheet border of its own, but a QFrame always
-# will. ItemEditDialog deliberately has none: it is big enough that the
-# decoration's own frame is edge enough.
-BORDER_STYLE = "#dialogFrame { border: 1px solid #a0a0a0; border-radius: 6px; }"
 
 
 class FolderNameDialog(QDialog):
@@ -36,6 +29,10 @@ class FolderNameDialog(QDialog):
         self.setWindowTitle(title)
         self.setModal(True)
         self.resize(440, 220)
+        # windowchrome's title bar and border (README §13). The border is also
+        # what keeps a dialog this small from losing its edge against the
+        # desktop behind it, which an inner bordered QFrame used to do.
+        apply_frame(self)
 
         self._name_edit = QLineEdit(current_name)
         self._name_edit.setStyleSheet(field_style())
@@ -52,21 +49,13 @@ class FolderNameDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
-        frame = QFrame(self)
-        frame.setObjectName("dialogFrame")
-        frame.setStyleSheet(BORDER_STYLE)
-
-        frame_layout = QVBoxLayout(frame)
-        frame_layout.setContentsMargins(24, 24, 24, 24)
-        frame_layout.setSpacing(14)
-        frame_layout.addWidget(label)
-        frame_layout.addWidget(self._name_edit)
-        frame_layout.addStretch(1)
-        frame_layout.addWidget(buttons)
-
-        outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(10, 10, 10, 10)
-        outer_layout.addWidget(frame)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(34, 34, 34, 34)
+        layout.setSpacing(14)
+        layout.addWidget(label)
+        layout.addWidget(self._name_edit)
+        layout.addStretch(1)
+        layout.addWidget(buttons)
 
         self._name_edit.textChanged.connect(self._validate)
         self._validate()

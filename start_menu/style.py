@@ -26,6 +26,11 @@ HOVER_BG = "rgba(158, 75, 46, 56)"
 # to this rather than drawn in whatever the theme ships: Qt's arrow art is
 # black, which all but vanishes on the dark desktop this app runs under.
 ARROW_COLOR = "#c8c8c8"
+# The scroll bars' handle, pinned to the gray the GTK theme's own scroll bars
+# use, so this window's bars match the GTK apps beside it. Their thickness is
+# windowchrome's (README §9), a couple of pixels off GTK's and not worth
+# special code.
+SCROLLBAR_HANDLE = "#777777"
 
 LABEL_STYLE = f"font-size: {UI_POINT_SIZE}pt;"
 BUTTON_STYLE = f"QPushButton {{ font-size: {UI_POINT_SIZE}pt; padding: 8px 20px; }}"

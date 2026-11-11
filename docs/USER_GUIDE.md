@@ -26,8 +26,9 @@ If the menu file exists but has a problem (invalid YAML, or a menu entry that's 
 
 ## The Main Window
 
-The window has four parts, top to bottom:
+The window has five parts, top to bottom, inside a thin gray border:
 
+- **Title bar** — a navy blue bar with the window's title in the middle and minimize, maximize and close buttons on the right. It dims while another window has focus. Drag it to move the window, double-click it to maximize or restore, and drag any edge or corner of the window to resize it. Start Menu draws this bar itself rather than using the desktop's, so it stands out against a dark theme; its dialogs and message boxes get the same bar (with only a close button). File pickers are the desktop's own and keep its usual title bar. To reach the desktop's window menu — for **Always on Top**, say — press `Alt+Space`.
 - **Menu bar** — an **Edit** menu holding **New Folder** (`Ctrl+Shift+N`) and **New Item** (`Ctrl+N`), then **Cut** (`Ctrl+X`), **Undo Cut** (`Ctrl+Z`) and **Paste** (`Ctrl+V`). The menu bar is only shown in edit mode, and even then each item is greyed out unless it applies right now (see [Moving Items Between Folders](#moving-items-between-folders)).
 - **Header** — a back arrow (`←`) button plus your current location as a breadcrumb (e.g. `Applications / Browsers`), shown whenever you've navigated into a folder. Clicking the arrow backs up one level, the same as pressing `←`. At the top level, where there's nothing to show and nowhere to back up to, the whole header disappears.
 - **The menu list** — the current folder's items, one per row, each with an icon and a label.
@@ -67,7 +68,7 @@ Every launchable item runs in one of four ways, decided when the item was create
 
 ### Quitting
 
-Press `Esc` at any time to close the window.
+Press `Esc` at any time to close the window, or click the close button (✕) at the right of the title bar.
 
 ## Edit Mode
 
