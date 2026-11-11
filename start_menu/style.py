@@ -31,6 +31,11 @@ ARROW_COLOR = "#c8c8c8"
 # windowchrome's (README §9), a couple of pixels off GTK's and not worth
 # special code.
 SCROLLBAR_HANDLE = "#777777"
+# Every edge drawn across or round the window's contents — under the menu
+# bar, round its drop-down, under the header, above the footer — in Crenel's
+# light gray. Left to Fusion these come out near-black, which reads as a hard
+# black rule against the dark desktop.
+DIVIDER_BORDER = "1px solid #9a9a9a"
 
 LABEL_STYLE = f"font-size: {UI_POINT_SIZE}pt;"
 BUTTON_STYLE = f"QPushButton {{ font-size: {UI_POINT_SIZE}pt; padding: 8px 20px; }}"

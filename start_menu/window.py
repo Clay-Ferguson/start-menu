@@ -58,7 +58,7 @@ from .nautilus import (
     target_type_label,
     with_target,
 )
-from .style import ARROW_COLOR, HIGHLIGHT_BG, HIGHLIGHT_FG, HOVER_BG
+from .style import ARROW_COLOR, DIVIDER_BORDER, HIGHLIGHT_BG, HIGHLIGHT_FG, HOVER_BG
 from .tree import MenuTreeView
 
 HINTS = "⏎ launch    Esc quit"
@@ -104,7 +104,15 @@ class MainWindow(QWidget):
         self.header = QLabel()
         self.header.setStyleSheet(f"font-weight: bold; font-size: {UI_POINT_SIZE + 1}pt;")
 
+        # The gray line under the header is what parts it from the list, whose
+        # own frame has no top edge (see `MenuTreeView._stylesheet`). A plain
+        # QWidget paints a stylesheet only with WA_StyledBackground, and the
+        # rule is aimed by object name so it doesn't cascade into the label
+        # and the back button.
         self.header_bar = QWidget()
+        self.header_bar.setObjectName("header_bar")
+        self.header_bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
+        self.header_bar.setStyleSheet(f"#header_bar {{ border-bottom: {DIVIDER_BORDER}; }}")
         header_layout = QHBoxLayout(self.header_bar)
         header_layout.setContentsMargins(10, 10, 14, 10)
         header_layout.setSpacing(8)
@@ -795,13 +803,32 @@ def _menu_stylesheet() -> str:
     between a label and its right-aligned shortcut, which otherwise sit
     almost touching ("Undo Cut Ctrl+Z"). A width on QMenu itself widens the
     frame but leaves the items, and their highlight, at their natural width.
+
+    The drop-down's edge is `DIVIDER_BORDER`, Crenel's light gray: left to the
+    native style it is near-black, and vanishes against the dark desktop. Its
+    background is restated beside it so a stylesheet-drawn frame can't come
+    out with no panel behind the items.
+
+    The bar's bottom edge is the same gray. Fusion draws a near-black line
+    there of its own, and a `border-bottom` here is what replaces it: once the
+    rule has a border, Qt paints the bar from the stylesheet rather than
+    handing it to the native style.
     """
     return f"""
-        QMenuBar {{ font-size: {UI_POINT_SIZE - 1}pt; padding: 2px 4px; }}
+        QMenuBar {{
+            font-size: {UI_POINT_SIZE - 1}pt;
+            padding: 2px 4px;
+            border-bottom: {DIVIDER_BORDER};
+        }}
         QMenuBar::item {{ padding: 6px 14px; background: transparent; }}
         QMenuBar::item:selected {{ background: {HOVER_BG}; }}
         QMenuBar::item:pressed {{ background: {HIGHLIGHT_BG}; color: {HIGHLIGHT_FG}; }}
-        QMenu {{ font-size: {UI_POINT_SIZE - 1}pt; padding: 6px 0; }}
+        QMenu {{
+            font-size: {UI_POINT_SIZE - 1}pt;
+            padding: 6px 0;
+            background: palette(window);
+            border: {DIVIDER_BORDER};
+        }}
         QMenu::item {{ padding: 8px 22px; min-width: 200px; background: transparent; }}
         QMenu::item:selected {{ background: {HIGHLIGHT_BG}; color: {HIGHLIGHT_FG}; }}
         QMenu::item:disabled:selected {{ background: transparent; }}

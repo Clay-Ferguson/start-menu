@@ -26,7 +26,14 @@ from windowchrome import apply_scrollbars
 from . import UI_POINT_SIZE
 from .icons import at_size, edit_icon
 from .menu import LAUNCH_TMUX, MenuNode
-from .style import ARROW_COLOR, HIGHLIGHT_BG, HIGHLIGHT_FG, HOVER_BG, SCROLLBAR_HANDLE
+from .style import (
+    ARROW_COLOR,
+    DIVIDER_BORDER,
+    HIGHLIGHT_BG,
+    HIGHLIGHT_FG,
+    HOVER_BG,
+    SCROLLBAR_HANDLE,
+)
 
 NODE_ROLE = Qt.ItemDataRole.UserRole
 
@@ -160,7 +167,12 @@ class MenuTreeView(QTreeView):
         # feature existed.
         right_padding = ACTION_AREA_WIDTH if self.edit_mode else 10
         return (
-            f"QTreeView {{ padding: 6px 0; }}"
+            # The border replaces Fusion's near-black frame with a single gray
+            # line above the footer. The other edges are left off: the menu
+            # bar and the header draw their own line above the list, and the
+            # window's border is already beside it at the sides.
+            f"QTreeView {{ padding: 6px 0; border: none;"
+            f" border-bottom: {DIVIDER_BORDER}; }}"
             # `background` looks redundant next to a transparent row, but it is
             # what makes the padding apply at all. Qt hands a row back to the
             # native style to paint whenever the item rule has nothing of its
