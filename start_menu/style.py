@@ -2,11 +2,13 @@
 
 Anything used by more than one module lives here, so a dialog never has to
 import `window` or `tree` just for a color. Styling only one module needs
-stays in that module. Imports nothing from the package except `UI_POINT_SIZE`.
+stays in that module. Imports nothing from the package except `UI_POINT_SIZE`;
+the divider gray comes from windowchrome.
 """
 
 from __future__ import annotations
 
+import windowchrome
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QApplication
 
@@ -32,10 +34,11 @@ ARROW_COLOR = "#c8c8c8"
 # special code.
 SCROLLBAR_HANDLE = "#777777"
 # Every edge drawn across or round the window's contents — under the menu
-# bar, round its drop-down, under the header, above the footer — in Crenel's
-# light gray. Left to Fusion these come out near-black, which reads as a hard
-# black rule against the dark desktop.
-DIVIDER_BORDER = "1px solid #9a9a9a"
+# bar, round its drop-down, under the header, above the footer — in
+# windowchrome's light gray, the one the menus are drawn with (README §14
+# there), so there is one copy of it. Left to Fusion these come out
+# near-black, which reads as a hard black rule against the dark desktop.
+DIVIDER_BORDER = windowchrome.DIVIDER_BORDER
 
 LABEL_STYLE = f"font-size: {UI_POINT_SIZE}pt;"
 BUTTON_STYLE = f"QPushButton {{ font-size: {UI_POINT_SIZE}pt; padding: 8px 20px; }}"

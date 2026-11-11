@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from windowchrome import ToggleSwitch, apply_frame
+from windowchrome import ToggleSwitch, apply_frame, apply_menus
 
 from . import APP_NAME, UI_POINT_SIZE, messages
 from .folder_dialog import FolderNameDialog
@@ -160,9 +160,18 @@ class MainWindow(QWidget):
             "C&lear Nautilus Items", None, self._handle_clear_nautilus
         )
         self.menu_bar = menu_bar = QMenuBar(self)
-        # Set on the bar, the sheet reaches the drop-down too: a QMenu made by
-        # `addMenu(title)` is the bar's child.
-        menu_bar.setStyleSheet(_menu_stylesheet())
+        # windowchrome's menu look (README §14): the gray edges, the roomy
+        # items, and a disabled item never highlighted. Set on the bar, it
+        # reaches the drop-down too: a QMenu made by `addMenu(title)` is the
+        # bar's child. The colors are the menu list's own orange rather than
+        # the desktop accent, and the type a point under the window's.
+        apply_menus(
+            menu_bar,
+            highlight=HIGHLIGHT_BG,
+            highlighted_text=HIGHLIGHT_FG,
+            hover=HOVER_BG,
+            point_size=UI_POINT_SIZE - 1,
+        )
         edit_menu = menu_bar.addMenu("&Edit")
         assert edit_menu is not None
         edit_menu.addAction(self.new_folder_action)
@@ -787,52 +796,6 @@ def ask_running_session(
     if clicked is terminate:
         return TMUX_TERMINATE
     return TMUX_CANCEL  # includes closing the dialog outright
-
-
-def _menu_stylesheet() -> str:
-    """The menu bar and its drop-down: the app's larger type, room around
-    each entry, and the app's own selection colors.
-
-    Once a QMenu::item rule draws a background, Qt stops handing items to the
-    native style, so the highlight has to be given here too — the same
-    orange as the menu list's selection bar, rather than the desktop accent.
-    A disabled item can still be "selected" by the mouse; it is kept plain,
-    so the highlight never suggests it can be chosen.
-
-    The `min-width` is on the item, not the menu: it is what opens a gap
-    between a label and its right-aligned shortcut, which otherwise sit
-    almost touching ("Undo Cut Ctrl+Z"). A width on QMenu itself widens the
-    frame but leaves the items, and their highlight, at their natural width.
-
-    The drop-down's edge is `DIVIDER_BORDER`, Crenel's light gray: left to the
-    native style it is near-black, and vanishes against the dark desktop. Its
-    background is restated beside it so a stylesheet-drawn frame can't come
-    out with no panel behind the items.
-
-    The bar's bottom edge is the same gray. Fusion draws a near-black line
-    there of its own, and a `border-bottom` here is what replaces it: once the
-    rule has a border, Qt paints the bar from the stylesheet rather than
-    handing it to the native style.
-    """
-    return f"""
-        QMenuBar {{
-            font-size: {UI_POINT_SIZE - 1}pt;
-            padding: 2px 4px;
-            border-bottom: {DIVIDER_BORDER};
-        }}
-        QMenuBar::item {{ padding: 6px 14px; background: transparent; }}
-        QMenuBar::item:selected {{ background: {HOVER_BG}; }}
-        QMenuBar::item:pressed {{ background: {HIGHLIGHT_BG}; color: {HIGHLIGHT_FG}; }}
-        QMenu {{
-            font-size: {UI_POINT_SIZE - 1}pt;
-            padding: 6px 0;
-            background: palette(window);
-            border: {DIVIDER_BORDER};
-        }}
-        QMenu::item {{ padding: 8px 22px; min-width: 200px; background: transparent; }}
-        QMenu::item:selected {{ background: {HIGHLIGHT_BG}; color: {HIGHLIGHT_FG}; }}
-        QMenu::item:disabled:selected {{ background: transparent; }}
-    """
 
 
 def _mtime(path: str) -> int | None:
